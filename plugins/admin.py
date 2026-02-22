@@ -2,7 +2,10 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from config import Config
 from database import db
+from utils.log import get_logger
 import asyncio
+
+logger = get_logger("plugins.admin")
 
 # Admin Session Store
 admin_sessions = {} # user_id: state
@@ -28,14 +31,16 @@ async def admin_panel(client, message):
         ])
     )
 
-# Remove filters.private from CallbackQuery handler
-@Client.on_callback_query(filters.regex(r"^admin_"))
+# Handler for main admin actions and template edits
+# Regex modified to catch "admin_" OR "edit_template_"
+@Client.on_callback_query(filters.regex(r"^(admin_|edit_template_)"))
 async def admin_callback(client, callback_query):
     user_id = callback_query.from_user.id
     if not is_admin(user_id):
         return
 
     data = callback_query.data
+    logger.info(f"Admin callback: {data} from user {user_id}")
 
     if data == "admin_thumb":
         admin_sessions[user_id] = "awaiting_thumb"
@@ -130,6 +135,7 @@ async def handle_admin_photo(client, message):
         await msg.edit_text("✅ Thumbnail updated successfully!")
         admin_sessions.pop(user_id, None)
     except Exception as e:
+        logger.error(f"Thumbnail upload failed: {e}")
         await msg.edit_text(f"❌ Error: {e}")
 
 @Client.on_message(filters.text & filters.private)

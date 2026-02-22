@@ -1,11 +1,13 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 from config import Config
-import logging
+from utils.log import get_logger
+
+logger = get_logger("database")
 
 class Database:
     def __init__(self):
         if not Config.MAIN_URI:
-            logging.warning("MAIN_URI is not set in environment variables.")
+            logger.warning("MAIN_URI is not set in environment variables.")
             self.client = None
             self.db = None
             self.settings = None
@@ -15,7 +17,7 @@ class Database:
             self.settings = self.db[Config.SETTINGS_COLLECTION]
 
     async def get_settings(self):
-        if not self.settings:
+        if self.settings is None:
             return None
 
         doc = await self.settings.find_one({"_id": "global_settings"})
@@ -31,7 +33,7 @@ class Database:
         return doc
 
     async def update_template(self, key, value):
-        if not self.settings: return
+        if self.settings is None: return
         await self.settings.update_one(
             {"_id": "global_settings"},
             {"$set": {f"templates.{key}": value}},
@@ -39,7 +41,7 @@ class Database:
         )
 
     async def update_thumbnail(self, file_id, binary_data):
-        if not self.settings: return
+        if self.settings is None: return
         await self.settings.update_one(
             {"_id": "global_settings"},
             {"$set": {"thumbnail_file_id": file_id, "thumbnail_binary": binary_data}},
@@ -47,7 +49,7 @@ class Database:
         )
 
     async def get_thumbnail(self):
-        if not self.settings: return None, None
+        if self.settings is None: return None, None
         doc = await self.settings.find_one({"_id": "global_settings"})
         if doc:
             return doc.get("thumbnail_binary"), doc.get("thumbnail_file_id")

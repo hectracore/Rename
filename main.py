@@ -1,13 +1,9 @@
 from pyrogram import Client, idle
 from config import Config
-import logging
+from utils.log import get_logger
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logging.getLogger("pyrogram").setLevel(logging.WARNING)
+logger = get_logger("main")
 
 # Initialize Bot
 app = Client(
@@ -20,11 +16,11 @@ app = Client(
 
 if __name__ == "__main__":
     if not Config.BOT_TOKEN:
-        logging.error("BOT_TOKEN is not set!")
+        logger.error("BOT_TOKEN is not set!")
         exit(1)
 
-    logging.info("Starting XTV Rename Bot...")
+    logger.info("Starting XTV Rename Bot...")
     app.start()
-    logging.info("Bot Started!")
+    logger.info("Bot Started!")
     idle()
     app.stop()
