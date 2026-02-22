@@ -4,20 +4,19 @@ from config import Config
 from database import db
 from utils.log import get_logger
 import asyncio
+import io
 
 logger = get_logger("plugins.admin")
 
-# Admin Session Store
-admin_sessions = {} # user_id: state
+admin_sessions = {}
 
 def is_admin(user_id):
     return user_id == Config.CEO_ID
 
-# For messages, filters.private is fine.
 @Client.on_message(filters.command("admin") & filters.private)
 async def admin_panel(client, message):
     if not is_admin(message.from_user.id):
-        return # Ignore non-admins
+        return
 
     await message.reply_text(
         "🛠 **XTV Admin Panel** 🛠\n\n"
@@ -25,14 +24,12 @@ async def admin_panel(client, message):
         "Manage global settings for the XTV Rename Bot.\n"
         "These settings affect all files processed by the bot.",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🖼 Set Default Thumbnail", callback_data="admin_thumb")],
+            [InlineKeyboardButton("🖼 Manage Thumbnail", callback_data="admin_thumb_menu")],
             [InlineKeyboardButton("📝 Edit Metadata Templates", callback_data="admin_templates")],
             [InlineKeyboardButton("👀 View Current Settings", callback_data="admin_view")]
         ])
     )
 
-# Handler for main admin actions and template edits
-# Regex modified to catch "admin_" OR "edit_template_"
 @Client.on_callback_query(filters.regex(r"^(admin_|edit_template_)"))
 async def admin_callback(client, callback_query):
     user_id = callback_query.from_user.id
@@ -42,13 +39,48 @@ async def admin_callback(client, callback_query):
     data = callback_query.data
     logger.info(f"Admin callback: {data} from user {user_id}")
 
-    if data == "admin_thumb":
+    if data == "admin_thumb_menu":
+        await callback_query.message.edit_text(
+            "🖼 **Manage Thumbnail**\n\n"
+            "Select an action:",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("👀 View Current", callback_data="admin_thumb_view")],
+                [InlineKeyboardButton("📤 Set Default", callback_data="admin_thumb_set")],
+                [InlineKeyboardButton("🔙 Back", callback_data="admin_main")]
+            ])
+        )
+
+    elif data == "admin_thumb_view":
+        thumb_bin, _ = await db.get_thumbnail()
+        if thumb_bin:
+            try:
+                # Send as photo
+                f = io.BytesIO(thumb_bin)
+                f.name = "thumbnail.jpg"
+                await client.send_photo(user_id, f, caption="**Current Default Thumbnail**")
+                # Go back to menu in text message
+                await callback_query.message.edit_text(
+                    "🖼 **Manage Thumbnail**\n\n"
+                    "Thumbnail sent above.",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("👀 View Current", callback_data="admin_thumb_view")],
+                        [InlineKeyboardButton("📤 Set Default", callback_data="admin_thumb_set")],
+                        [InlineKeyboardButton("🔙 Back", callback_data="admin_main")]
+                    ])
+                )
+            except Exception as e:
+                logger.error(f"Failed to send thumbnail: {e}")
+                await callback_query.answer("Error sending thumbnail!", show_alert=True)
+        else:
+            await callback_query.answer("No thumbnail set in DB!", show_alert=True)
+
+    elif data == "admin_thumb_set":
         admin_sessions[user_id] = "awaiting_thumb"
         await callback_query.message.edit_text(
-            "🖼 **Set Default Thumbnail**\n\n"
+            "📤 **Set Default Thumbnail**\n\n"
             "Please send the **photo** you want to set as the default cover art/thumbnail for all files.\n"
             "This will be embedded into every video processed.",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="admin_cancel")]])
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="admin_thumb_menu")]])
         )
 
     elif data == "admin_templates":
@@ -87,14 +119,13 @@ async def admin_callback(client, callback_query):
 
     elif data == "admin_main" or data == "admin_cancel":
         admin_sessions.pop(user_id, None)
-        # Re-send main panel
         await callback_query.message.edit_text(
             "🛠 **XTV Admin Panel** 🛠\n\n"
             "Welcome, CEO.\n"
             "Manage global settings for the XTV Rename Bot.\n"
             "These settings affect all files processed by the bot.",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🖼 Set Default Thumbnail", callback_data="admin_thumb")],
+                [InlineKeyboardButton("🖼 Manage Thumbnail", callback_data="admin_thumb_menu")],
                 [InlineKeyboardButton("📝 Edit Metadata Templates", callback_data="admin_templates")],
                 [InlineKeyboardButton("👀 View Current Settings", callback_data="admin_view")]
             ])
@@ -104,7 +135,6 @@ async def admin_callback(client, callback_query):
         field = data.split("_")[-1]
         admin_sessions[user_id] = f"awaiting_template_{field}"
 
-        # Get current val
         templates = await db.get_all_templates()
         current_val = templates.get(field, "")
 
@@ -113,7 +143,7 @@ async def admin_callback(client, callback_query):
             f"Send the new template text.\n"
             f"Current: `{current_val}`\n\n"
             f"Variables: `{{title}}`, `{{season_episode}}`, `{{lang}}` (for audio/subtitle)",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="admin_cancel")]])
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="admin_templates")]])
         )
 
 @Client.on_message(filters.photo & filters.private)
@@ -132,7 +162,8 @@ async def handle_admin_photo(client, message):
 
         await db.update_thumbnail(file_id, binary_data)
 
-        await msg.edit_text("✅ Thumbnail updated successfully!")
+        await msg.edit_text("✅ Thumbnail updated successfully!",
+                            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to Menu", callback_data="admin_thumb_menu")]]))
         admin_sessions.pop(user_id, None)
     except Exception as e:
         logger.error(f"Thumbnail upload failed: {e}")
@@ -152,5 +183,6 @@ async def handle_admin_text(client, message):
     new_template = message.text
 
     await db.update_template(field, new_template)
-    await message.reply_text(f"✅ Template for **{field.capitalize()}** updated to:\n`{new_template}`")
+    await message.reply_text(f"✅ Template for **{field.capitalize()}** updated to:\n`{new_template}`",
+                             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to Templates", callback_data="admin_templates")]]))
     admin_sessions.pop(user_id, None)
