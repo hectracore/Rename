@@ -7,8 +7,9 @@ from utils.log import get_logger
 logger = get_logger("plugins.start")
 logger.info("Loading plugins.start...")
 
-@Client.on_message(filters.command(["start", "new"]) & filters.private)
-async def start_command(client, message):
+# Use group=1 to match flow.py and ensure visibility
+@Client.on_message(filters.command(["start", "new"]) & filters.private, group=1)
+async def handle_start_command_unique(client, message):
     user_id = message.from_user.id
     logger.info(f"CMD received: {message.text} from {user_id}")
 
@@ -26,8 +27,8 @@ async def start_command(client, message):
         ])
     )
 
-@Client.on_message(filters.command("end") & filters.private)
-async def end_command(client, message):
+@Client.on_message(filters.command("end") & filters.private, group=1)
+async def handle_end_command_unique(client, message):
     user_id = message.from_user.id
     logger.info(f"CMD received: {message.text} from {user_id}")
     await message.reply_text("Session ended. Use /start or /new to begin again.")
