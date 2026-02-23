@@ -6,11 +6,14 @@ from utils.log import get_logger
 logger = get_logger("main")
 
 # Initialize Bot
+# High performance settings: workers=50, max_concurrent_transmissions=10
 app = Client(
     "xtv_rename_bot",
     api_id=Config.API_ID,
     api_hash=Config.API_HASH,
     bot_token=Config.BOT_TOKEN,
+    workers=50,
+    max_concurrent_transmissions=10,
     plugins=dict(root="plugins")
 )
 
@@ -22,7 +25,9 @@ if Config.USER_SESSION:
         "xtv_user_bot",
         api_id=Config.API_ID,
         api_hash=Config.API_HASH,
-        session_string=Config.USER_SESSION
+        session_string=Config.USER_SESSION,
+        workers=50,
+        max_concurrent_transmissions=10
     )
     app.user_bot = user_bot # Attach to main app for easy access in plugins
 else:
