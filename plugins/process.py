@@ -159,17 +159,24 @@ class TaskProcessor:
                 original_media = self.file_message.document or self.file_message.video
 
                 if original_media:
-                    # Scan recent messages in Userbot's chat with Bot to find matching file
-                    async for msg in self.active_client.get_chat_history(bot_username, limit=20):
-                        media = msg.document or msg.video
-                        if media and media.file_unique_id == original_media.file_unique_id:
-                            target_message = msg
-                            found = True
-                            logger.info(f"Resolved Userbot message ID: {msg.id}")
-                            break
+                    # Retry logic with delay
+                    for attempt in range(3):
+                        await asyncio.sleep(2) # Allow time for propagation
+                        logger.info(f"Scanning Userbot history... Attempt {attempt+1}")
+
+                        # Scan recent messages in Userbot's chat with Bot to find matching file
+                        # Increased limit to ensure we catch it
+                        async for msg in self.active_client.get_chat_history(bot_username, limit=50):
+                            media = msg.document or msg.video
+                            if media and media.file_unique_id == original_media.file_unique_id:
+                                target_message = msg
+                                found = True
+                                logger.info(f"Resolved Userbot message ID: {msg.id}")
+                                break
+                        if found: break
 
                 if not found:
-                    logger.warning("Could not resolve message in Userbot history. Attempting fallback.")
+                    logger.warning("Could not resolve message in Userbot history. Using original (risky).")
             except Exception as e:
                 logger.error(f"Error resolving Userbot message: {e}")
 
