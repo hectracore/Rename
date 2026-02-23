@@ -276,14 +276,13 @@ class TaskProcessor:
                 thumb=thumb,
                 caption=caption,
                 progress=progress_for_pyrogram,
-                progress_args=("📤 **Uploading Final Asset...**", self.status_msg, upload_start)
+                progress_args=("📤 **Uploading Final File...**", self.status_msg, upload_start)
             )
 
             await self.status_msg.delete()
             await self.message.reply_text(
                 "✅ **Processing Complete**\n\n"
                 f"📂 **File:** `{final_filename}`\n\n"
-                f"{XTVEngine.get_footer()}"
             )
 
         except Exception as e:
