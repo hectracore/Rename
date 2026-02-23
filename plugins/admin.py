@@ -26,6 +26,7 @@ async def admin_panel(client, message):
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🖼 Manage Thumbnail", callback_data="admin_thumb_menu")],
             [InlineKeyboardButton("📝 Edit Metadata Templates", callback_data="admin_templates")],
+            [InlineKeyboardButton("📝 Edit Caption Template", callback_data="admin_caption")],
             [InlineKeyboardButton("👀 View Current Settings", callback_data="admin_view")]
         ])
     )
@@ -96,6 +97,24 @@ async def admin_callback(client, callback_query):
             ])
         )
 
+    elif data == "admin_caption":
+        templates = await db.get_all_templates()
+        current_caption = templates.get("caption", "{random}")
+        admin_sessions[user_id] = "awaiting_template_caption"
+
+        await callback_query.message.edit_text(
+            "📝 **Edit Caption Template**\n\n"
+            "Send the new caption text for uploaded files.\n\n"
+            f"Current: `{current_caption}`\n\n"
+            "**Variables:**\n"
+            "- `{filename}` : The final filename\n"
+            "- `{size}` : File size (e.g. 1.5 GB)\n"
+            "- `{duration}` : Video duration\n"
+            "- `{random}` : Generates a random alphanumeric string (Anti-Hash)\n\n"
+            "Send `{random}` to use the default random text generator.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="admin_main")]])
+        )
+
     elif data == "admin_view":
         settings = await db.get_settings()
         templates = settings.get("templates", {}) if settings else {}
@@ -106,7 +125,10 @@ async def admin_callback(client, callback_query):
         text += "**Metadata Templates:**\n"
         if templates:
             for k, v in templates.items():
-                text += f"- **{k.capitalize()}:** `{v}`\n"
+                if k == "caption":
+                    text += f"- **Caption:** `{v}`\n"
+                else:
+                    text += f"- **{k.capitalize()}:** `{v}`\n"
         else:
             text += "No templates set."
 
@@ -125,6 +147,7 @@ async def admin_callback(client, callback_query):
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("🖼 Manage Thumbnail", callback_data="admin_thumb_menu")],
                 [InlineKeyboardButton("📝 Edit Metadata Templates", callback_data="admin_templates")],
+                [InlineKeyboardButton("📝 Edit Caption Template", callback_data="admin_caption")],
                 [InlineKeyboardButton("👀 View Current Settings", callback_data="admin_view")]
             ])
         )
@@ -181,6 +204,12 @@ async def handle_admin_text(client, message):
     new_template = message.text
 
     await db.update_template(field, new_template)
+
+    if field == "caption":
+        reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to Menu", callback_data="admin_main")]])
+    else:
+        reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to Templates", callback_data="admin_templates")]])
+
     await message.reply_text(f"✅ Template for **{field.capitalize()}** updated to:\n`{new_template}`",
-                             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to Templates", callback_data="admin_templates")]]))
+                             reply_markup=reply_markup)
     admin_sessions.pop(user_id, None)

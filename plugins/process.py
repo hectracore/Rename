@@ -2,6 +2,8 @@ import os
 import time
 import asyncio
 import re
+import random
+import string
 from pyrogram import Client
 from config import Config
 from database import db
@@ -131,16 +133,10 @@ async def process_file(client, message, data):
         "default_language": "English"
     }
 
-    # Use message ID in output filename temporarily to avoid collision if needed,
-    # but usually output filename is unique by title/season/episode.
-    # However, if we process multiple resolutions of same file, it might conflict.
-    # For now, we trust the final filename is unique enough or we overwrite.
-    # To be safe, let's just use the intended final filename.
     output_path = os.path.join(Config.DOWNLOAD_DIR, final_filename)
 
     # Check if output file already exists (race condition check)
     if os.path.exists(output_path):
-         # If file exists, append a timestamp or ID to make it unique temporarily
          output_path = os.path.join(Config.DOWNLOAD_DIR, f"{int(time.time())}_{final_filename}")
 
     cmd, err = await generate_ffmpeg_command(
@@ -152,7 +148,6 @@ async def process_file(client, message, data):
 
     if not cmd:
         await status_msg.edit_text(f"❌ **FFmpeg Error**\n\n`{err}`")
-        # Cleanup input
         if os.path.exists(file_path): os.remove(file_path)
         if os.path.exists(thumb_path): os.remove(thumb_path)
         return
@@ -161,7 +156,6 @@ async def process_file(client, message, data):
     if not success:
         print(stderr.decode())
         await status_msg.edit_text("❌ **Encoding Failed**\n\nSomething went wrong during processing.")
-        # Cleanup
         if os.path.exists(file_path): os.remove(file_path)
         if os.path.exists(thumb_path): os.remove(thumb_path)
         if os.path.exists(output_path): os.remove(output_path)
@@ -174,12 +168,40 @@ async def process_file(client, message, data):
     )
 
     start_time = time.time()
+
+    # Generate Caption
+    caption_template = templates.get("caption", "{random}")
+    if "{random}" in caption_template or caption_template == "{random}":
+        # Generate random string to bypass hash detection
+        random_str = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+        final_caption = random_str
+    else:
+        # Helper to get human readable size
+        def humanbytes(size):
+            if not size: return ""
+            power = 2**10
+            n = 0
+            Dic_powerN = {0: ' ', 1: 'K', 2: 'M', 3: 'G', 4: 'T'}
+            while size > power:
+                size /= power
+                n += 1
+            return str(round(size, 2)) + " " + Dic_powerN[n] + 'B'
+
+        file_size_str = humanbytes(os.path.getsize(output_path))
+        # We don't have duration easily available without probing again, so we'll skip duration for now or default
+        final_caption = caption_template.format(
+            filename=final_filename,
+            size=file_size_str,
+            duration="", # Placeholder
+            random=''.join(random.choices(string.ascii_letters + string.digits, k=8))
+        )
+
     try:
         await client.send_document(
             chat_id=message.chat.id,
             document=output_path,
             thumb=thumb_path if os.path.exists(thumb_path) else None,
-            caption=f"✅ **{final_filename}**",
+            caption=final_caption,
             progress=progress_for_pyrogram,
             progress_args=("📤 **Uploading...**", status_msg, start_time)
         )
