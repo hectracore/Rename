@@ -241,6 +241,7 @@ async def handle_admin_text(client, message):
         field = state.replace("awaiting_fn_template_", "")
         new_template = message.text
         await db.update_filename_template(field, new_template)
+        reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to Filename Templates", callback_data="admin_filename_templates")]])
         await message.reply_text(f"✅ Filename template for **{field.capitalize()}** updated to:\n`{new_template}`",
                                  reply_markup=reply_markup)
         admin_sessions.pop(user_id, None)
