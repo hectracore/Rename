@@ -22,6 +22,7 @@ The **XTV Rename Bot** is a high-performance, enterprise-grade Telegram bot engi
     *   *Series*: Season/Episode numbering (S01E01) format.
     *   *Movies*: Clean Title.Year.Quality format.
 *   **Subtitle Workflow**: Dedicated flow for subtitle files (`.srt`, `.ass`), supporting language codes and custom naming.
+*   **Dynamic Filename Templates**: Fully customizable filename structures via the Admin Panel for Movies, Series, and Subtitles using variables like `{Title}`, `{Year}`, `{Quality}`, `{Season}`, `{Episode}`, `{Season_Episode}`, `{Language}`, and `{Channel}`.
 
 ### 🔹 Professional Metadata Injection
 *   **FFmpeg Power**: Injects custom metadata (Title, Author, Artist, Copyright) directly into MKV/MP4 containers.
@@ -33,9 +34,10 @@ The **XTV Rename Bot** is a high-performance, enterprise-grade Telegram bot engi
 *   **Concurrency Control**: Global semaphore system prevents server overload by managing simultaneous downloads/uploads.
 
 ### 🔹 Other Features
-*   **Admin Panel**: Full control over bot settings, templates, and thumbnails via an inline menu.
+*   **Admin Panel**: Full control over bot settings, metadata templates, filename templates, and thumbnails via an inline menu.
 *   **Custom Thumbnails**: Set a global default thumbnail for all processed files.
 *   **Caption Templates**: Customizable templates with variables like `{filename}`, `{size}`, and `{duration}`.
+*   **Channel Branding**: Set a global `{Channel}` variable in the Admin Panel (e.g., `@XTVglobal`) to inject into filenames and metadata.
 *   **Force Subtitles**: Intelligent logic to set default subtitle tracks.
 *   **Album Support**: Handles multiple file uploads (albums) concurrently without issues.
 *   **Session State**: Robust user state management allows for cancelling and restarting flows easily.
