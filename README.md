@@ -11,13 +11,14 @@ The **XTV Rename Bot** is a high-performance, enterprise-grade Telegram bot engi
 
 ### 🔹 Advanced Processing Engines
 *   **XTV Core™**: Lightning-fast processing for standard files (up to 2GB) using the primary bot API.
-*   **XTV Pro™**: Seamless integration with a Userbot session to handle **Large Files (>2GB)**, bypassing standard bot limitations (Premium required).
+*   **XTV Pro™**: Seamless integration with a Userbot session to handle **Large Files (up to 4GB)**, bypassing standard bot limitations (Premium required).
 
 ### 🔹 Intelligent Recognition
 *   **Auto-Detection Matrix**: Automatically scans filenames to detect Movie/Series titles, Years, Qualities, and Episode numbers with high accuracy.
 *   **Smart Metadata Fetching**: Integration with **TMDb** to pull official titles, release years, and artwork.
 
 ### 🔹 Media Management
+*   **Personal Media & Unlisted Content**: Direct menu options to bypass metadata databases (e.g., TMDb) for personal files, camera footage, photos, and unlisted regional content. Smartly preserves original file extensions (like `.jpeg`) and lets you choose your preferred output format.
 *   **Series & Movies**: Specialized handling for different media types.
     *   *Series*: Season/Episode numbering (S01E01) format.
     *   *Movies*: Clean Title.Year.Quality format.
