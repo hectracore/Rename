@@ -219,6 +219,38 @@ class Database:
         except Exception as e:
             logger.error(f"Error updating dumb channel timeout: {e}")
 
+    # --- XTV PRO Session Management ---
+    async def get_pro_session(self):
+        """Fetch the 𝕏TV Pro™ (Userbot) session credentials."""
+        if self.settings is None: return None
+        doc = await self.settings.find_one({"_id": "xtv_pro_settings"})
+        if doc:
+            return {
+                "session_string": doc.get("session_string"),
+                "api_id": doc.get("api_id"),
+                "api_hash": doc.get("api_hash")
+            }
+        return None
+
+    async def save_pro_session(self, session_string: str, api_id: int = None, api_hash: str = None):
+        """Save the XTV Pro session credentials to the database."""
+        if self.settings is None: return
+        update_doc = {"session_string": session_string}
+        if api_id and api_hash:
+            update_doc["api_id"] = api_id
+            update_doc["api_hash"] = api_hash
+
+        await self.settings.update_one(
+            {"_id": "xtv_pro_settings"},
+            {"$set": update_doc},
+            upsert=True
+        )
+
+    async def delete_pro_session(self):
+        """Delete the XTV Pro session from the database."""
+        if self.settings is None: return
+        await self.settings.delete_one({"_id": "xtv_pro_settings"})
+
     # --- PUBLIC_MODE Global Configs ---
     async def get_public_config(self):
         """Fetch the global public mode configuration set by the CEO."""

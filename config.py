@@ -8,9 +8,6 @@ class Config:
     API_ID = int(os.getenv("API_ID", 0))
     API_HASH = os.getenv("API_HASH")
 
-    # User Session (for 4GB uploads)
-    USER_SESSION = os.getenv("USER_SESSION")
-
     # MongoDB
     MAIN_URI = os.getenv("MAIN_URI")
     DB_NAME = "MainDB"  # The main database name

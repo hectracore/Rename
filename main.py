@@ -38,20 +38,6 @@ app = Client(
 
 # Initialize Userbot (for >2GB support)
 user_bot = None
-if Config.USER_SESSION:
-    logger.info("USER_SESSION detected. Initializing Premium Userbot...")
-    user_bot = Client(
-        "xtv_user_bot",
-        api_id=Config.API_ID,
-        api_hash=Config.API_HASH,
-        session_string=Config.USER_SESSION,
-        workers=50,
-        max_concurrent_transmissions=10
-    )
-    app.user_bot = user_bot # Attach to main app for easy access in plugins
-else:
-    app.user_bot = None
-    logger.warning("No USER_SESSION found. 4GB upload support is DISABLED.")
 
 if __name__ == "__main__":
     if not Config.BOT_TOKEN:
@@ -61,14 +47,44 @@ if __name__ == "__main__":
     logger.info("Starting XTV Rename Bot...")
     app.start()
 
-    if user_bot:
-        logger.info("Starting Premium Userbot...")
-        try:
+    # Cache dialogs to resolve PEER_ID_INVALID on ephemeral hostings
+    logger.info("Caching peers to avoid PEER_ID_INVALID...")
+    try:
+        async def cache_peers():
+            async for _ in app.get_dialogs(limit=50):
+                pass
+        app.loop.run_until_complete(cache_peers())
+    except Exception as e:
+        logger.warning(f"Failed to cache peers: {e}")
+
+    # Fetch Userbot session from Database
+    try:
+        from database import db
+        async def get_userbot_session():
+            return await db.get_pro_session()
+        pro_data = app.loop.run_until_complete(get_userbot_session())
+
+        if pro_data and pro_data.get("session_string"):
+            logger.info("𝕏TV Pro™ Session detected in database. Initializing Premium Userbot...")
+            user_bot = Client(
+                "xtv_user_bot",
+                api_id=pro_data.get("api_id", Config.API_ID),
+                api_hash=pro_data.get("api_hash", Config.API_HASH),
+                session_string=pro_data.get("session_string"),
+                workers=50,
+                max_concurrent_transmissions=10
+            )
+            app.user_bot = user_bot
+
+            logger.info("Starting 𝕏TV Pro™ Premium Userbot...")
             user_bot.start()
-            logger.info("Userbot Started Successfully!")
-        except Exception as e:
-            logger.error(f"Failed to start Userbot: {e}")
-            app.user_bot = None # Disable if failed
+            logger.info("𝕏TV Pro™ Premium Userbot Started Successfully!")
+        else:
+            app.user_bot = None
+            logger.warning("No 𝕏TV Pro™ Session found in database. 4GB upload support is DISABLED.")
+    except Exception as e:
+        logger.error(f"Failed to initialize Userbot from DB: {e}")
+        app.user_bot = None
 
     logger.info("Bot Started!")
     idle()
