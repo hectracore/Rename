@@ -528,6 +528,7 @@ class TaskProcessor:
                     wait_start = time.time()
                     timeout = await db.get_dumb_channel_timeout()
                     wait_msg = None
+                    last_wait_text = None
 
                     while True:
                         blocking_item = queue_manager.get_blocking_item(batch_id, item_id)
@@ -541,16 +542,25 @@ class TaskProcessor:
                             break
 
                         wait_text = f"⏳ **Waiting for {blocking_item.display_name} to finish To send it in the dumb channel**"
+
                         if not wait_msg:
                             wait_msg = await self.message.reply_text(wait_text)
-                        elif wait_msg.text != wait_text:
-                            # Update message if the blocking item changed
-                            await wait_msg.edit_text(wait_text)
+                            last_wait_text = wait_text
+                        elif last_wait_text != wait_text:
+                            # Update message if the blocking item changed, catching potential errors
+                            try:
+                                await wait_msg.edit_text(wait_text)
+                                last_wait_text = wait_text
+                            except Exception as e:
+                                logger.warning(f"Failed to edit wait message: {e}")
 
                         await asyncio.sleep(5)
 
                     if wait_msg:
-                        await wait_msg.delete()
+                        try:
+                            await wait_msg.delete()
+                        except Exception:
+                            pass
 
                     # Now send to dumb channel
                     try:
