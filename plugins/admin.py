@@ -28,7 +28,8 @@ async def admin_panel(client, message):
                  InlineKeyboardButton("📢 Edit Force-Sub Channel", callback_data="admin_public_force_sub")],
                 [InlineKeyboardButton("⏱ Edit Rate Limits", callback_data="admin_public_rate_limit"),
                  InlineKeyboardButton("⏱ Edit Dumb Channel Timeout", callback_data="admin_dumb_timeout")],
-                [InlineKeyboardButton("👀 View Public Config", callback_data="admin_public_view")]
+                [InlineKeyboardButton("👀 View Public Config", callback_data="admin_public_view")],
+                [InlineKeyboardButton("🚀 Manage 𝕏TV Pro™", callback_data="admin_xtv_pro")]
             ])
         )
     else:
@@ -44,7 +45,8 @@ async def admin_panel(client, message):
                 [InlineKeyboardButton("📝 Edit Caption Template", callback_data="admin_caption")],
                 [InlineKeyboardButton("📺 Dumb Channels", callback_data="admin_dumb_channels")],
                 [InlineKeyboardButton("⚙️ Settings", callback_data="admin_settings")],
-                [InlineKeyboardButton("👀 View Current Settings", callback_data="admin_view")]
+                [InlineKeyboardButton("👀 View Current Settings", callback_data="admin_view")],
+                [InlineKeyboardButton("🚀 Manage 𝕏TV Pro™", callback_data="admin_xtv_pro")]
             ])
         )
 
