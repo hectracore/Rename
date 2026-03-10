@@ -92,70 +92,12 @@ if __name__ == "__main__":
             user_bot.start()
             logger.info("𝕏TV Pro™ Premium Userbot Started Successfully!")
 
-            # To prevent PEER_ID_INVALID on the Main Bot when copying files into the private tunnel,
-            # the Userbot (which is immune to bot limitations) must send a message to the tunnel,
-            # forcing Telegram to sync the channel's peer info back to the Main Bot instantly.
-            tunnel_id = pro_data.get("tunnel_id")
-            tunnel_link = pro_data.get("tunnel_link")
-
-            if tunnel_id and tunnel_link:
-                try:
-                    logger.info(f"Caching Pro Tunnel peer for Userbot via invite link...")
-                    # Userbot must resolve the invite link to cache the peer for itself
-                    app.loop.run_until_complete(user_bot.get_chat(tunnel_link))
-
-                    logger.info(f"Pinging Pro Tunnel ({tunnel_id}) to synchronize peer data with Main Bot...")
-                    # Send a silent ping and delete it immediately
-                    msg = app.loop.run_until_complete(user_bot.send_message(tunnel_id, "ping", disable_notification=True))
-                    app.loop.run_until_complete(user_bot.delete_messages(tunnel_id, msg.id))
-                    logger.info("Tunnel Peer successfully cached for Main Bot!")
-                except Exception as e:
-                    logger.warning(f"Could not ping Pro Tunnel on startup (this is okay if the tunnel is already cached): {e}")
-
         else:
             app.user_bot = None
             logger.warning("No 𝕏TV Pro™ Session found in database. 4GB upload support is DISABLED.")
     except Exception as e:
         logger.error(f"Failed to initialize Userbot from DB: {e}")
         app.user_bot = None
-
-    # Background Task for Auto-Cleanup of the Pro Tunnel Channel
-    async def cleanup_tunnel():
-        import asyncio
-        from datetime import datetime, timedelta, timezone
-
-        while True:
-            try:
-                # Run once a day
-                await asyncio.sleep(86400)
-
-                pro_session = await db.get_pro_session()
-                tunnel_id = pro_session.get("tunnel_id") if pro_session else None
-
-                if tunnel_id and app.user_bot:
-                    logger.info("Running scheduled cleanup for Pro Tunnel Channel...")
-                    two_days_ago = datetime.now(timezone.utc) - timedelta(days=2)
-
-                    messages_to_delete = []
-                    async for msg in app.user_bot.get_chat_history(tunnel_id):
-                        if msg.date < two_days_ago:
-                            messages_to_delete.append(msg.id)
-
-                        # Delete in batches of 100 (Telegram limit)
-                        if len(messages_to_delete) >= 100:
-                            await app.user_bot.delete_messages(tunnel_id, messages_to_delete)
-                            messages_to_delete = []
-                            await asyncio.sleep(1)
-
-                    if messages_to_delete:
-                        await app.user_bot.delete_messages(tunnel_id, messages_to_delete)
-
-                    logger.info("Scheduled cleanup for Pro Tunnel Channel complete.")
-            except Exception as e:
-                logger.error(f"Error during Tunnel cleanup task: {e}")
-
-    if app.user_bot:
-        app.loop.create_task(cleanup_tunnel())
 
     logger.info("Bot Started!")
     idle()

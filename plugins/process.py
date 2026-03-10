@@ -129,7 +129,7 @@ class TaskProcessor:
             logger.exception(f"Critical error in task for user {self.user_id}: {e}")
             await self._update_status(f"❌ **Critical System Error**\n\n`{str(e)}`")
         finally:
-            self._cleanup()
+            await self._cleanup()
 
     async def _initialize(self) -> bool:
         """Check system requirements and initialize status."""
@@ -190,46 +190,48 @@ class TaskProcessor:
         target_message = self.file_message
         if self.mode == "pro":
             try:
-                # Fetch tunnel ID
-                pro_session = await db.get_pro_session()
-                self.tunnel_id = pro_session.get("tunnel_id")
+                # Create Ephemeral Tunnel Channel using Userbot
+                bot_me = await self.client.get_me()
+                bot_username = bot_me.username
 
-                if not self.tunnel_id:
-                    await self._update_status("❌ **Tunnel Configuration Error**\n\nPro Tunnel ID not found in database. Please run /admin to setup XTV Pro again.")
-                    return False
+                channel = await self.active_client.create_channel(
+                    title=f"𝕏TV Pro Ephemeral {self.message_id}",
+                    description="Temporary tunnel for XTV Bot."
+                )
+                self.tunnel_id = channel.id
 
-                # Copy message to tunnel
-                try:
-                    tunnel_msg = await self.client.copy_message(
-                        chat_id=self.tunnel_id,
-                        from_chat_id=self.file_message.chat.id,
-                        message_id=self.file_message.id
+                # Add main bot to channel and promote
+                from pyrogram.types import ChatPrivileges
+                await self.active_client.promote_chat_member(
+                    self.tunnel_id,
+                    bot_username,
+                    privileges=ChatPrivileges(
+                        can_manage_chat=True,
+                        can_delete_messages=True,
+                        can_manage_video_chats=True,
+                        can_restrict_members=True,
+                        can_promote_members=True,
+                        can_change_info=True,
+                        can_post_messages=True,
+                        can_edit_messages=True,
+                        can_invite_users=True,
+                        can_pin_messages=True
                     )
-                except Exception as ce:
-                    if "PEER_ID_INVALID" in str(ce):
-                        logger.warning(f"Main Bot got PEER_ID_INVALID for tunnel {self.tunnel_id}. Attempting to force-cache via Userbot ping...")
-                        # The Userbot should have the peer because it created the tunnel or cached it on startup via the invite link.
-                        # Send a ping from the Userbot to force Telegram to notify the Main Bot (as an admin) of the channel's existence.
-                        try:
-                            ping_msg = await self.active_client.send_message(self.tunnel_id, "ping", disable_notification=True)
-                            await ping_msg.delete()
-                            await asyncio.sleep(1) # Give Pyrogram a moment to process the update
+                )
 
-                            # Retry copy
-                            tunnel_msg = await self.client.copy_message(
-                                chat_id=self.tunnel_id,
-                                from_chat_id=self.file_message.chat.id,
-                                message_id=self.file_message.id
-                            )
-                        except Exception as ping_e:
-                            logger.error(f"Failed to force-cache tunnel peer: {ping_e}")
-                            raise ce # Raise original exception if retry fails
-                    else:
-                        raise ce
+                # Send a ping from the Userbot to force Telegram to notify the Main Bot (as an admin) of the channel's existence.
+                ping_msg = await self.active_client.send_message(self.tunnel_id, "ping", disable_notification=True)
+                await ping_msg.delete()
+                await asyncio.sleep(1) # Give Pyrogram a moment to process the update
 
-                # Since the main bot and userbot are in the same channel,
-                # the message ID is the same for both.
-                # However, it's safer to use get_messages on the Userbot client to resolve it correctly.
+                # Main Bot copies message to tunnel
+                tunnel_msg = await self.client.copy_message(
+                    chat_id=self.tunnel_id,
+                    from_chat_id=self.file_message.chat.id,
+                    message_id=self.file_message.id
+                )
+
+                # Userbot retrieves the copied message
                 target_message = await self.active_client.get_messages(
                     chat_id=self.tunnel_id,
                     message_ids=tunnel_msg.id
@@ -243,7 +245,7 @@ class TaskProcessor:
                 self.tunneled_message_id = tunnel_msg.id
 
             except Exception as e:
-                logger.error(f"Error resolving Userbot message via Tunnel: {e}")
+                logger.error(f"Error creating/resolving Ephemeral Tunnel: {e}")
                 await self._update_status(f"❌ **Tunnel Bridge Error**\n\n`{e}`")
                 return False
 
@@ -584,6 +586,13 @@ class TaskProcessor:
             item_id = self.data.get("item_id")
             if batch_id and item_id:
                 queue_manager.update_status(batch_id, item_id, "failed", str(e))
+        finally:
+            if is_tunneling and self.tunnel_id:
+                try:
+                    await self.active_client.delete_channel(self.tunnel_id)
+                    logger.info(f"Cleaned up ephemeral tunnel {self.tunnel_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to cleanup ephemeral tunnel {self.tunnel_id}: {e}")
 
     def _generate_caption(self, filename: str) -> str:
         """Generate a secure caption based on templates."""
@@ -619,14 +628,21 @@ class TaskProcessor:
         except Exception as e:
             logger.warning(f"Failed to update status message: {e}")
 
-    def _cleanup(self):
-        """Clean up temporary files."""
+    async def _cleanup(self):
+        """Clean up temporary files and tunnel."""
         for path in [self.input_path, self.output_path, self.thumb_path]:
             if path and os.path.exists(path):
                 try:
                     os.remove(path)
                 except Exception as e:
                     logger.warning(f"Failed to remove temp file {path}: {e}")
+
+        # Fallback to ensure tunnel is deleted if process failed mid-way
+        if self.mode == "pro" and self.tunnel_id:
+            try:
+                await self.active_client.delete_channel(self.tunnel_id)
+            except Exception:
+                pass
 
 # Entry point for the plugin system
 async def process_file(client, message, data):
