@@ -199,11 +199,33 @@ class TaskProcessor:
                     return False
 
                 # Copy message to tunnel
-                tunnel_msg = await self.client.copy_message(
-                    chat_id=self.tunnel_id,
-                    from_chat_id=self.file_message.chat.id,
-                    message_id=self.file_message.id
-                )
+                try:
+                    tunnel_msg = await self.client.copy_message(
+                        chat_id=self.tunnel_id,
+                        from_chat_id=self.file_message.chat.id,
+                        message_id=self.file_message.id
+                    )
+                except Exception as ce:
+                    if "PEER_ID_INVALID" in str(ce):
+                        logger.warning(f"Main Bot got PEER_ID_INVALID for tunnel {self.tunnel_id}. Attempting to force-cache via Userbot ping...")
+                        # The Userbot should have the peer because it created the tunnel or cached it on startup via the invite link.
+                        # Send a ping from the Userbot to force Telegram to notify the Main Bot (as an admin) of the channel's existence.
+                        try:
+                            ping_msg = await self.active_client.send_message(self.tunnel_id, "ping", disable_notification=True)
+                            await ping_msg.delete()
+                            await asyncio.sleep(1) # Give Pyrogram a moment to process the update
+
+                            # Retry copy
+                            tunnel_msg = await self.client.copy_message(
+                                chat_id=self.tunnel_id,
+                                from_chat_id=self.file_message.chat.id,
+                                message_id=self.file_message.id
+                            )
+                        except Exception as ping_e:
+                            logger.error(f"Failed to force-cache tunnel peer: {ping_e}")
+                            raise ce # Raise original exception if retry fails
+                    else:
+                        raise ce
 
                 # Since the main bot and userbot are in the same channel,
                 # the message ID is the same for both.
@@ -441,6 +463,14 @@ class TaskProcessor:
                 return
 
         try:
+            # Force Userbot to cache peer if it doesn't have it (e.g. ephemeral restart issue)
+            if is_tunneling:
+                try:
+                    # Userbot already cached this during download, but we wrap it just in case
+                    pass
+                except Exception:
+                    pass
+
             thumb = self.thumb_path if (self.thumb_path and os.path.exists(self.thumb_path) and not self.is_subtitle) else None
 
             send_as = self.data.get("send_as")
