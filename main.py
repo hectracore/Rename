@@ -50,7 +50,8 @@ if __name__ == "__main__":
     # Cache Dumb Channel peers using stored invite links to prevent PEER_ID_INVALID on ephemeral hosts
     try:
         from database import db
-        async def cache_dumb_channels():
+        async def cache_channels():
+            # Dumb Channels
             links = await db.get_all_dumb_channel_links()
             for link in links:
                 try:
@@ -58,10 +59,19 @@ if __name__ == "__main__":
                     await app.get_chat(link)
                 except Exception as e:
                     logger.warning(f"Failed to cache peer for link {link}: {e}")
-        logger.info("Caching Dumb Channel peers...")
-        app.loop.run_until_complete(cache_dumb_channels())
+
+            # Pro Tunnel Channel
+            pro_session = await db.get_pro_session()
+            if pro_session and pro_session.get("tunnel_link"):
+                try:
+                    await app.get_chat(pro_session.get("tunnel_link"))
+                except Exception as e:
+                    logger.warning(f"Failed to cache peer for Pro Tunnel link: {e}")
+
+        logger.info("Caching Channel peers...")
+        app.loop.run_until_complete(cache_channels())
     except Exception as e:
-        logger.warning(f"Error during Dumb Channel caching: {e}")
+        logger.warning(f"Error during Channel caching: {e}")
 
     # Fetch Userbot session from Database
     try:
@@ -91,6 +101,44 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"Failed to initialize Userbot from DB: {e}")
         app.user_bot = None
+
+    # Background Task for Auto-Cleanup of the Pro Tunnel Channel
+    async def cleanup_tunnel():
+        import asyncio
+        from datetime import datetime, timedelta, timezone
+
+        while True:
+            try:
+                # Run once a day
+                await asyncio.sleep(86400)
+
+                pro_session = await db.get_pro_session()
+                tunnel_id = pro_session.get("tunnel_id") if pro_session else None
+
+                if tunnel_id and app.user_bot:
+                    logger.info("Running scheduled cleanup for Pro Tunnel Channel...")
+                    two_days_ago = datetime.now(timezone.utc) - timedelta(days=2)
+
+                    messages_to_delete = []
+                    async for msg in app.user_bot.get_chat_history(tunnel_id):
+                        if msg.date < two_days_ago:
+                            messages_to_delete.append(msg.id)
+
+                        # Delete in batches of 100 (Telegram limit)
+                        if len(messages_to_delete) >= 100:
+                            await app.user_bot.delete_messages(tunnel_id, messages_to_delete)
+                            messages_to_delete = []
+                            await asyncio.sleep(1)
+
+                    if messages_to_delete:
+                        await app.user_bot.delete_messages(tunnel_id, messages_to_delete)
+
+                    logger.info("Scheduled cleanup for Pro Tunnel Channel complete.")
+            except Exception as e:
+                logger.error(f"Error during Tunnel cleanup task: {e}")
+
+    if app.user_bot:
+        app.loop.create_task(cleanup_tunnel())
 
     logger.info("Bot Started!")
     idle()

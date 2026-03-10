@@ -82,6 +82,8 @@ class TaskProcessor:
         # Hybrid Workflow Logic
         self.mode = "core"
         self.active_client = self.client
+        self.tunnel_id = None
+        self.tunneled_message_id = None
 
         try:
              # Check for user_bot attached to client
@@ -186,35 +188,42 @@ class TaskProcessor:
 
         # Target Message Resolution for Userbot
         target_message = self.file_message
-        if self.mode == "pro" and self.message.chat.type == ChatType.PRIVATE:
+        if self.mode == "pro":
             try:
-                bot_info = await self.client.get_me()
-                bot_username = bot_info.username
+                # Fetch tunnel ID
+                pro_session = await db.get_pro_session()
+                self.tunnel_id = pro_session.get("tunnel_id")
 
-                found = False
-                original_media = self.file_message.document or self.file_message.video
+                if not self.tunnel_id:
+                    await self._update_status("❌ **Tunnel Configuration Error**\n\nPro Tunnel ID not found in database. Please run /admin to setup XTV Pro again.")
+                    return False
 
-                if original_media:
-                    # Retry logic with delay
-                    for attempt in range(3):
-                        await asyncio.sleep(2) # Allow time for propagation
-                        logger.info(f"Scanning Userbot history... Attempt {attempt+1}")
+                # Copy message to tunnel
+                tunnel_msg = await self.client.copy_message(
+                    chat_id=self.tunnel_id,
+                    from_chat_id=self.file_message.chat.id,
+                    message_id=self.file_message.id
+                )
 
-                        # Scan recent messages in Userbot's chat with Bot to find matching file
-                        # Increased limit to ensure we catch it
-                        async for msg in self.active_client.get_chat_history(bot_username, limit=50):
-                            media = msg.document or msg.video
-                            if media and media.file_unique_id == original_media.file_unique_id:
-                                target_message = msg
-                                found = True
-                                logger.info(f"Resolved Userbot message ID: {msg.id}")
-                                break
-                        if found: break
+                # Since the main bot and userbot are in the same channel,
+                # the message ID is the same for both.
+                # However, it's safer to use get_messages on the Userbot client to resolve it correctly.
+                target_message = await self.active_client.get_messages(
+                    chat_id=self.tunnel_id,
+                    message_ids=tunnel_msg.id
+                )
 
-                if not found:
-                    logger.warning("Could not resolve message in Userbot history. Using original (risky).")
+                if not target_message or target_message.empty:
+                    logger.error(f"Could not fetch copied message {tunnel_msg.id} from tunnel {self.tunnel_id} via Userbot.")
+                    await self._update_status("❌ **Tunnel Resolution Error**\n\nUserbot failed to see the file in the internal tunnel.")
+                    return False
+
+                self.tunneled_message_id = tunnel_msg.id
+
             except Exception as e:
-                logger.error(f"Error resolving Userbot message: {e}")
+                logger.error(f"Error resolving Userbot message via Tunnel: {e}")
+                await self._update_status(f"❌ **Tunnel Bridge Error**\n\n`{e}`")
+                return False
 
         try:
             downloaded_path = await self.active_client.download_media(
@@ -418,26 +427,18 @@ class TaskProcessor:
 
         # Target Chat Resolution & Tunneling
         # In Core mode: Bot uploads directly to the User (or group).
-        # In Pro mode: Userbot uploads to a designated storage/tunnel channel (or bot PM if none exists),
+        # In Pro mode: Userbot uploads to the designated tunnel channel,
         # then the Bot copies the file to the User. This hides the Userbot's identity from the user.
         target_chat_id = self.user_id
         is_tunneling = False
-        used_pm_tunnel = False
 
         if self.mode == "pro":
             is_tunneling = True
-            try:
-                # Use the default dumb channel as the tunnel if available.
-                # If no dumb channel is set for the bot globally, fallback to the bot's username (PMs).
-                dumb_channel = await db.get_default_dumb_channel(self.user_id)
-                if dumb_channel:
-                    target_chat_id = int(dumb_channel) if str(dumb_channel).lstrip("-").isdigit() else dumb_channel
-                else:
-                    bot_info = await self.client.get_me()
-                    target_chat_id = bot_info.username
-                    used_pm_tunnel = True
-            except Exception as e:
-                logger.error(f"Failed to resolve tunnel target for Pro upload: {e}")
+            if self.tunnel_id:
+                target_chat_id = self.tunnel_id
+            else:
+                await self._update_status("❌ **Upload Configuration Error**\n\nPro Tunnel ID not initialized.")
+                return
 
         try:
             thumb = self.thumb_path if (self.thumb_path and os.path.exists(self.thumb_path) and not self.is_subtitle) else None
@@ -462,51 +463,16 @@ class TaskProcessor:
                     progress_args=("📤 **Uploading Final File (Tunneling)...**" if is_tunneling else "📤 **Uploading Final File...**", self.status_msg, upload_start, self.mode)
                 )
 
-            # If tunneling via Pro mode, the file is now in the tunnel chat.
+            # If tunneling via Pro mode, the file is now in the internal tunnel channel.
             # The Main Bot must now copy it to the end-user to hide the Userbot.
+            # Because both are in the same tunnel channel, the message IDs are identical.
             if is_tunneling:
                 try:
-                    from_chat_id = media_msg.chat.id
-                    message_id_to_copy = media_msg.id
-
-                    # If the tunnel was the Bot's PM, the Userbot's media_msg.id will NOT match the Main Bot's message ID
-                    # for that exact same message (since Telegram separates IDs in private chats).
-                    # We must find the correct message ID from the Main Bot's perspective.
-                    if used_pm_tunnel:
-                        # Search the main bot's chat history with the Userbot for the file.
-                        userbot_me = await self.active_client.get_me()
-                        from_chat_id = userbot_me.id
-
-                        # Wait briefly for Telegram to sync the message to the bot's inbox
-                        await asyncio.sleep(2)
-
-                        found = False
-                        # Use userbot_me.id instead of username to prevent crashes if the Premium account has no username set
-                        async for bot_msg in self.client.get_chat_history(userbot_me.id, limit=10):
-                            bot_media = bot_msg.document or bot_msg.video or bot_msg.photo
-                            userbot_media = media_msg.document or media_msg.video or media_msg.photo
-                            if bot_media and userbot_media and bot_media.file_unique_id == userbot_media.file_unique_id:
-                                message_id_to_copy = bot_msg.id
-                                found = True
-                                break
-
-                        if not found:
-                            raise Exception("Could not locate tunneled message in Bot's PM history.")
-
                     await self.client.copy_message(
                         chat_id=self.user_id,
-                        from_chat_id=from_chat_id,
-                        message_id=message_id_to_copy
+                        from_chat_id=self.tunnel_id,
+                        message_id=media_msg.id
                     )
-
-                    # If we used the bot's PM as a tunnel, delete the message from the bot PM to avoid clutter
-                    if used_pm_tunnel:
-                        await self.client.delete_messages(chat_id=from_chat_id, message_ids=message_id_to_copy)
-                        # Optional: Also delete it from the Userbot's side
-                        try:
-                            await media_msg.delete()
-                        except:
-                            pass
                 except Exception as e:
                     logger.error(f"Failed to copy tunneled file to user {self.user_id}: {e}")
                     await self.client.send_message(self.user_id, f"❌ **Delivery Error**\n\nThe file was processed successfully but the bot failed to deliver it to you from the tunnel. Error: `{e}`")
@@ -564,16 +530,12 @@ class TaskProcessor:
 
                     # Now send to dumb channel
                     try:
-                        # If tunneling was used, the file might ALREADY be in the target channel
-                        # if the target_chat_id matched dumb_channel. But in batch processing,
-                        # we need them strictly ordered. However, if is_tunneling uploaded it to
-                        # dumb_channel out of order, it ruins the sequence.
-                        # Wait, for now, we just ensure it copies it to the final destination.
-                        # Using self.client guarantees the bot performs the transmission, not the userbot.
-                        if is_tunneling and str(target_chat_id) == str(dumb_channel):
-                            # The file was already uploaded to the dumb channel by the userbot as the tunnel.
-                            # We just need to register it as done.
-                            pass
+                        if is_tunneling:
+                            await self.client.copy_message(
+                                chat_id=dumb_channel,
+                                from_chat_id=self.tunnel_id,
+                                message_id=media_msg.id
+                            )
                         else:
                             await self.client.copy_message(
                                 chat_id=dumb_channel,

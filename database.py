@@ -242,9 +242,20 @@ class Database:
             return {
                 "session_string": doc.get("session_string"),
                 "api_id": doc.get("api_id"),
-                "api_hash": doc.get("api_hash")
+                "api_hash": doc.get("api_hash"),
+                "tunnel_id": doc.get("tunnel_id"),
+                "tunnel_link": doc.get("tunnel_link")
             }
         return None
+
+    async def save_pro_tunnel(self, tunnel_id: int, tunnel_link: str):
+        """Save the XTV Pro Internal Tunnel channel info."""
+        if self.settings is None: return
+        await self.settings.update_one(
+            {"_id": "xtv_pro_settings"},
+            {"$set": {"tunnel_id": tunnel_id, "tunnel_link": tunnel_link}},
+            upsert=True
+        )
 
     async def save_pro_session(self, session_string: str, api_id: int = None, api_hash: str = None):
         """Save the XTV Pro session credentials to the database."""

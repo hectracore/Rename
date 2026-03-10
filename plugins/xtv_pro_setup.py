@@ -180,6 +180,47 @@ async def finalize_setup(userbot, user_id, msg):
 
         await db.save_pro_session(session_string, data["api_id"], data["api_hash"])
 
+        # Auto-Create Tunnel Channel
+        await msg.edit_text("⏳ **Initializing Internal Pro Tunnel...**")
+
+        try:
+            bot_me = await msg._client.get_me()
+            bot_username = bot_me.username
+
+            # Create a private channel
+            channel = await userbot.create_channel(
+                title="𝕏TV Pro™ Internal Tunnel",
+                description="Do not delete. Used by XTV Bot to bridge >2GB files between users and the Userbot."
+            )
+            tunnel_id = channel.id
+
+            # Add main bot to channel and promote
+            from pyrogram.types import ChatPrivileges
+            await userbot.promote_chat_member(
+                tunnel_id,
+                bot_username,
+                privileges=ChatPrivileges(
+                    can_manage_chat=True,
+                    can_delete_messages=True,
+                    can_manage_video_chats=True,
+                    can_restrict_members=True,
+                    can_promote_members=True,
+                    can_change_info=True,
+                    can_post_messages=True,
+                    can_edit_messages=True,
+                    can_invite_users=True,
+                    can_pin_messages=True
+                )
+            )
+
+            # Create an invite link so the Main Bot can cache the peer
+            invite_link_obj = await userbot.create_chat_invite_link(tunnel_id)
+            tunnel_link = invite_link_obj.invite_link
+
+            await db.save_pro_tunnel(tunnel_id, tunnel_link)
+        except Exception as tunnel_e:
+            logger.error(f"Failed to create tunnel: {tunnel_e}")
+
         await msg.edit_text(
             "✅ **𝕏TV Pro™ Setup Complete!**\n\n"
             f"Successfully authenticated as **{me.first_name}**.\n"
