@@ -34,7 +34,8 @@ async def pro_menu(client, callback_query):
     if session:
         status = "✅ **𝕏TV Pro™ is Active**\n\nThe 4GB tunnel Userbot is fully setup and running."
         buttons = [
-            [InlineKeyboardButton("🗑 Delete Session & Re-Setup", callback_data="pro_setup_start")],
+            [InlineKeyboardButton("🗑 Delete Session", callback_data="pro_setup_delete")],
+            [InlineKeyboardButton("🔄 Re-Setup", callback_data="pro_setup_start")],
             [InlineKeyboardButton("🔙 Back to Admin Menu", callback_data="admin_main")]
         ]
     else:
@@ -45,6 +46,27 @@ async def pro_menu(client, callback_query):
         ]
 
     await callback_query.message.edit_text(status, reply_markup=InlineKeyboardMarkup(buttons))
+
+@Client.on_callback_query(filters.regex(r"^pro_setup_delete$"))
+async def delete_setup(client, callback_query):
+    user_id = callback_query.from_user.id
+    if user_id != Config.CEO_ID: return
+
+    await db.delete_pro_session()
+
+    # Try stopping user bot if it's running
+    if getattr(client, "user_bot", None):
+        try:
+            await client.user_bot.stop()
+        except:
+            pass
+        client.user_bot = None
+
+    await callback_query.message.edit_text(
+        "✅ **Session Deleted!**\n\n"
+        "𝕏TV Pro™ has been disabled. The Userbot session was securely deleted from the database.",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to Menu", callback_data="pro_setup_menu")]])
+    )
 
 @Client.on_callback_query(filters.regex(r"^pro_setup_start$"))
 async def start_setup(client, callback_query):
