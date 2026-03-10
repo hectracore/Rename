@@ -57,86 +57,11 @@ The **XTV Rename Bot** is a high-performance, enterprise-grade **Telegram Bot** 
 
 ## 🛠 Deployment Guide
 
-### 1. Deploy on Render.com (Highly Recommended - Zero Egress Costs)
+We have created comprehensive, beginner-friendly, step-by-step guides for deploying the 𝕏TV Rename Bot across multiple platforms. This includes a full walkthrough for taking advantage of **Oracle Cloud's 10TB Free Egress Bandwidth** using their Always Free ARM A1 instance.
 
-**Why Render?** Telegram bots that process media use significant bandwidth downloading and uploading files. Platforms like Railway charge high fees for bandwidth (egress). Render provides **generous unmetered bandwidth**, saving you from unexpected bills!
+### 👉 [Click Here for the Full Deployment Guide](DEPLOYMENT.md) 👈
 
-This repository includes a `render.yaml` blueprint for a seamless, 1-click deployment.
-
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
-
-**Beginner-Friendly Setup Guide:**
-1.  **Fork this Repository** to your GitHub account.
-2.  Sign up or log in to [Render.com](https://render.com).
-3.  Click **New +** and select **Blueprint**.
-4.  Connect your GitHub account and select your forked `XTVrename-bot` repository.
-5.  Render will automatically detect the `render.yaml` file. Click **Apply**.
-6.  You will be prompted to fill in the **Environment Variables**. Most are standard (`BOT_TOKEN`, `API_ID`, etc. - *see Configuration below*), but pay special attention to **`PUBLIC_MODE`**:
-    *   Type **`True`** if you want the bot open to everyone (Public Mode).
-    *   Type **`False`** if you want the bot locked so only you (the CEO) can use it (Private Mode).
-7.  Click **Save** and Render will automatically build and start your bot as a Background Worker!
-
-> **Note on Free Tier & RAM:** The blueprint defaults to Render's Free Tier, which requires **no credit card**. However, since this bot uses **FFmpeg** to process large media files, it can consume significant RAM. If your bot crashes or restarts during heavy video processing (like embedding thumbnails into large MKV files), you may need to upgrade your Render plan to give the bot more memory.
-
-### 2. Deploy on Railway
-
-This repository is also optimized for **Railway** with a custom `Dockerfile`, though be aware of potential bandwidth (egress) costs.
-
-1.  **Fork this Repository** to your GitHub account.
-2.  **Create a New Project** on [Railway.app](https://railway.app).
-3.  **Deploy from GitHub Repo** and select your forked repository.
-4.  **Add Variables**: Go to the "Variables" tab and add the configuration (see below).
-5.  **Build & Deploy**: Railway will automatically detect the Dockerfile and start the bot.
-
-### 3. Oracle Cloud (The Ultimate Solution for 10TB Free Egress)
-
-If you have been struggling with massive bandwidth (egress) bills on platforms like Railway because of heavy media processing, **Oracle Cloud's Always Free ARM A1 Instance is the ultimate solution.** You get 4 CPU Cores, 24GB of RAM, and **10TB of Free Egress Bandwidth** every month!
-
-**Step-by-Step Oracle Setup:**
-1. **Create Instance:** Go to the Oracle Cloud console, create a new compute instance, and select **Canonical Ubuntu**. Change the shape to **Ampere VM.Standard.A1.Flex** (ARM), and max out the sliders (4 OCPUs, 24GB RAM). Assign a Public IPv4 address.
-2. **Connect via SSH:** `ssh -i /path/to/key ubuntu@YOUR_SERVER_IP`
-3. **Install Docker & Docker Compose:**
-   ```bash
-   sudo apt update && sudo apt upgrade -y
-   sudo apt install docker.io docker-compose -y
-   sudo systemctl enable --now docker
-   sudo usermod -aG docker ubuntu
-   # (Log out and back in for the group to apply)
-   ```
-4. **Deploy the Bot:**
-   ```bash
-   # Clone the repo
-   git clone https://github.com/davdxpx/XTVrename-bot.git
-   cd XTVrename-bot
-
-   # Configure Environment
-   cp .env.example .env
-   nano .env # Fill in your API_ID, BOT_TOKEN, etc.
-
-   # Build & Run in the background
-   docker-compose up -d --build
-   ```
-   *(Note: Our Dockerfile automatically detects the ARM architecture and optimizes the build!)*
-
-### 4. Local / VPS (Standard Docker)
-
-If you prefer using standard Docker commands instead of Docker Compose:
-
-```bash
-# 1. Clone the repo
-git clone https://github.com/davdxpx/XTVrename-bot.git
-cd XTVrename-bot
-
-# 2. Configure Environment
-cp .env.example .env
-nano .env # Add your tokens here
-
-# 3. Build the image
-docker build -t xtv-bot .
-
-# 4. Run the container
-docker run -d --env-file .env --name xtv-bot xtv-bot
-```
+---
 
 ## ⚙️ Configuration (.env)
 
