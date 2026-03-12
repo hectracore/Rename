@@ -288,14 +288,12 @@ async def handle_text_input(client, message):
         action = state.replace("awaiting_audio_", "")
 
         if action == "thumb":
-            if not getattr(message, "photo", None):
-                await message.reply_text("Please send a photo for the cover art.")
-                return
-            update_data(user_id, "audio_thumb_id", message.photo.file_id)
-        else:
-            val = message.text.strip() if getattr(message, "text", None) else ""
-            if val == "-": val = ""
-            update_data(user_id, f"audio_{action}", val)
+            await message.reply_text("Please send a valid photo for the cover art. Text is not accepted.")
+            return
+
+        val = message.text.strip() if getattr(message, "text", None) else ""
+        if val == "-": val = ""
+        update_data(user_id, f"audio_{action}", val)
 
         set_state(user_id, "awaiting_audio_menu")
         await render_audio_menu(client, message, user_id)
@@ -462,7 +460,41 @@ async def handle_tmdb_selection(client, callback_query):
 
 async def prompt_dumb_channel(client, user_id, message_obj, is_edit=False):
     channels = await db.get_dumb_channels(user_id)
+    session_data = get_data(user_id)
+
     if not channels:
+        if session_data.get("type") == "general":
+            # Direct to process since file is already uploaded
+            data = {
+                "type": "general",
+                "original_name": session_data.get("original_name"),
+                "file_message_id": session_data.get("file_message_id"),
+                "file_chat_id": session_data.get("file_chat_id"),
+                "is_auto": False,
+                "dumb_channel": None,
+                "send_as": session_data.get("send_as"),
+                "general_name": session_data.get("general_name")
+            }
+
+            meta = analyze_filename(session_data.get("original_name"))
+            data.update(meta)
+
+            try:
+                msg = await client.get_messages(session_data.get("file_chat_id"), session_data.get("file_message_id"))
+                data["file_message"] = msg
+                text = "Processing file..."
+                if is_edit: await message_obj.edit_text(text)
+                else: await message_obj.reply_text(text)
+                from plugins.process import process_file
+                asyncio.create_task(process_file(client, message_obj if is_edit else message_obj, data))
+            except Exception as e:
+                logger.error(f"Failed to get message for general mode: {e}")
+                if is_edit: await message_obj.edit_text(f"Error: {e}")
+                else: await message_obj.reply_text(f"Error: {e}")
+
+            clear_session(user_id)
+            return
+
         set_state(user_id, "awaiting_file_upload")
         text = "✅ **Ready!**\n\nNow, **send me the file(s)** you want to rename."
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="cancel_rename")]])
@@ -494,37 +526,6 @@ async def handle_dumb_selection(client, callback_query):
         update_data(user_id, "dumb_channel", ch_id)
     else:
         update_data(user_id, "dumb_channel", None)
-
-    session_data = get_data(user_id)
-
-    if session_data.get("type") == "general":
-        # For general mode, the file was already uploaded at the start of the flow
-        data = {
-            "type": "general",
-            "original_name": session_data.get("original_name"),
-            "file_message_id": session_data.get("file_message_id"),
-            "file_chat_id": session_data.get("file_chat_id"),
-            "is_auto": False,
-            "dumb_channel": session_data.get("dumb_channel"),
-            "send_as": session_data.get("send_as"),
-            "general_name": session_data.get("general_name")
-        }
-
-        meta = analyze_filename(session_data.get("original_name"))
-        data.update(meta)
-
-        try:
-            msg = await client.get_messages(session_data.get("file_chat_id"), session_data.get("file_message_id"))
-            data["file_message"] = msg
-            await callback_query.message.edit_text("Processing file...")
-            from plugins.process import process_file
-            asyncio.create_task(process_file(client, callback_query.message, data))
-        except Exception as e:
-            logger.error(f"Failed to get message for general mode: {e}")
-            await callback_query.message.edit_text(f"Error: {e}")
-
-        clear_session(user_id)
-        return
 
     set_state(user_id, "awaiting_file_upload")
     await callback_query.message.edit_text(
@@ -678,11 +679,22 @@ from database import db
 from utils.queue_manager import queue_manager
 import uuid
 
-
 @Client.on_message((filters.document | filters.video | filters.photo | filters.audio | filters.voice) & filters.private, group=2)
 async def handle_file_upload(client, message):
     user_id = message.from_user.id
     state = get_state(user_id)
+
+    if state == "awaiting_audio_thumb":
+        if getattr(message, "photo", None):
+            update_data(user_id, "audio_thumb_id", message.photo.file_id)
+        elif getattr(message, "document", None) and "image" in (message.document.mime_type or ""):
+            update_data(user_id, "audio_thumb_id", message.document.file_id)
+        else:
+            await message.reply_text("Please send a valid photo for the cover art.")
+            return
+        set_state(user_id, "awaiting_audio_menu")
+        await render_audio_menu(client, message, user_id)
+        return
 
     if state == "awaiting_convert_file":
         if not getattr(message, "photo", None) and not getattr(message, "video", None) and not getattr(message, "document", None):
