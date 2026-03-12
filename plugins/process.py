@@ -501,7 +501,7 @@ class TaskProcessor:
                 cmd.extend(["-vn", "-c:a", "libmp3lame", "-q:a", "2"])
             elif target_format == "gif":
                 cmd.extend(["-vf", "fps=10,scale=320:-1:flags=lanczos", "-c:v", "gif"])
-            elif target_format in ["png", "jpg", "jpeg", "webp"]:
+            elif target_format in ["png", "jpg", "jpeg", "webp", "pdf"]:
                 cmd.extend(["-vframes", "1"])
             else:
                 cmd.extend(["-c", "copy"])
