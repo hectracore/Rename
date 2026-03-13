@@ -13,12 +13,12 @@
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-XTV_Public_v2.0-red.svg)](https://github.com/davdxpx/XTVrename-bot/blob/main/LICENSE)
 
-The **XTV Rename Bot** is a high-performance, enterprise-grade **Telegram Bot** engineered for automated media processing, file renaming, and video metadata editing. It combines robust **FFmpeg** metadata injection with intelligent file renaming algorithms, designed specifically for maintaining large-scale media libraries on Telegram. Whether you need an **auto renamer bot**, a **TMDb movie scraper**, or a **video metadata editor**, XTV Rename Bot is the ultimate **media management solution**.
+The **𝕏TV Rename Bot** is a high-performance, enterprise-grade **Telegram Bot** engineered for automated media processing, file renaming, and video metadata editing. It combines robust **FFmpeg** metadata injection with intelligent file renaming algorithms, designed specifically for maintaining large-scale media libraries on Telegram. Whether you need an **auto renamer bot**, a **TMDb movie scraper**, or a **video metadata editor**, XTV Rename Bot is the ultimate **media management solution**.
 
 ## 🌟 Key Features
 
 ### 🔹 Advanced Processing Engines
-*   **XTV Core™**: Lightning-fast processing for standard files (up to 2GB) using the primary bot API.
+*   **𝕏TV Core™**: Lightning-fast processing for standard files (up to 2GB) using the primary bot API.
 *   **𝕏TV Pro™ Ephemeral Tunnels (Market First!)**: Seamless integration with a Premium Userbot session to handle **Large Files (>2GB up to 4GB)**. The system generates secure, temporary private tunnels for every single large file transfer, bypassing API limits, cache crashing, and `PEER_ID_INVALID` errors.
 
 ### 🔹 Intelligent Recognition
@@ -77,7 +77,7 @@ Create a `.env` file in the root directory. You will need a **MongoDB** instance
 | `BOT_TOKEN` | Bot Token from @BotFather | ✅ |
 | `MAIN_URI` | MongoDB Connection String | ✅ |
 | `CEO_ID` | Your Telegram User ID (Admin) | ✅ |
-| `ADMIN_IDS` | Allowed User IDs (comma separated) (Formerly FRANCHISEE_IDS) | ❌ |
+| `ADMIN_IDS` | Allowed User IDs (comma separated) | ❌ |
 | `PUBLIC_MODE` | Set to `True` to allow anyone to use the bot. | ❌ |
 | `TMDB_API_KEY` | TMDb API Key for metadata | ✅ |
 
