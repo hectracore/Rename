@@ -214,6 +214,7 @@ async def admin_callback(client, callback_query):
             "user_main",
             "settings_main",
             "dumb_menu",
+            "admin_broadcast"
         ] and not callback_query.data.startswith("cancel"):
             await callback_query.answer(
                 "⚠️ Session expired. Please start again.", show_alert=True
@@ -1401,6 +1402,62 @@ async def handle_admin_text(client, message):
             await db.update_public_config("rate_limit_delay", int(val))
             await message.reply_text(
                 f"✅ Rate limit updated to `{val}` seconds.",
+                reply_markup=InlineKeyboardMarkup(
+                    [
+                        [
+                            InlineKeyboardButton(
+                                "🔙 Back to Menu", callback_data="admin_main"
+                            )
+                        ]
+                    ]
+                ),
+            )
+        elif field == "daily_egress":
+            if not val.isdigit():
+                await message.reply_text(
+                    "❌ Invalid number. Try again.",
+                    reply_markup=InlineKeyboardMarkup(
+                        [
+                            [
+                                InlineKeyboardButton(
+                                    "❌ Cancel", callback_data="admin_main"
+                                )
+                            ]
+                        ]
+                    ),
+                )
+                return
+            await db.update_public_config("daily_egress_mb", int(val))
+            await message.reply_text(
+                f"✅ Daily egress limit updated to `{val}` MB.",
+                reply_markup=InlineKeyboardMarkup(
+                    [
+                        [
+                            InlineKeyboardButton(
+                                "🔙 Back to Menu", callback_data="admin_main"
+                            )
+                        ]
+                    ]
+                ),
+            )
+        elif field == "daily_files":
+            if not val.isdigit():
+                await message.reply_text(
+                    "❌ Invalid number. Try again.",
+                    reply_markup=InlineKeyboardMarkup(
+                        [
+                            [
+                                InlineKeyboardButton(
+                                    "❌ Cancel", callback_data="admin_main"
+                                )
+                            ]
+                        ]
+                    ),
+                )
+                return
+            await db.update_public_config("daily_file_count", int(val))
+            await message.reply_text(
+                f"✅ Daily files limit updated to `{val}` files.",
                 reply_markup=InlineKeyboardMarkup(
                     [
                         [

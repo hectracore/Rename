@@ -27,6 +27,11 @@ async def broadcast_callback(client, callback_query):
             "user_main",
             "settings_main",
             "dumb_menu",
+            "admin_broadcast",
+            "broadcast_add_btn",
+            "broadcast_preview",
+            "broadcast_send",
+            "broadcast_cancel"
         ] and not callback_query.data.startswith("cancel"):
             await callback_query.answer(
                 "⚠️ Session expired. Please start again.", show_alert=True
