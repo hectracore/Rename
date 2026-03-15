@@ -928,9 +928,9 @@ async def usage_command(client, message):
         max_percent = 100
 
     # Generate progress bar using block characters
-    # 10 blocks total
-    filled_blocks = int(max_percent / 10)
-    empty_blocks = 10 - filled_blocks
+    # 12 blocks total
+    filled_blocks = int((max_percent / 100) * 12)
+    empty_blocks = 12 - filled_blocks
     progress_bar = ("█" * filled_blocks) + ("░" * empty_blocks)
 
     text = (

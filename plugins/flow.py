@@ -1114,11 +1114,7 @@ async def handle_file_upload(client, message):
     if media:
         file_size = media.file_size
 
-        # Check daily quota
-        quota_ok, error_msg, _ = await db.check_daily_quota(user_id, file_size)
-        if not quota_ok:
-            await message.reply_text(f"🛑 **Quota Exceeded**\n\n{error_msg}")
-            return
+        # WE MOVED QUOTA CHECK OUT OF HERE AND INTO process_file()
 
         if file_size > 4000 * 1024 * 1024:
             await message.reply_text(
