@@ -41,6 +41,9 @@ class BatchQueue:
 
         return None
 
+    def is_batch_complete(self) -> bool:
+        return all(item.status in ["done", "done_dumb", "done_user", "failed"] for item in self.items.values())
+
 
 class QueueManager:
     def __init__(self):
@@ -79,6 +82,11 @@ class QueueManager:
         if batch_id in self.batches:
             return self.batches[batch_id].is_blocked(item_id)
         return None
+
+    def is_batch_complete(self, batch_id: str) -> bool:
+        if batch_id in self.batches:
+            return self.batches[batch_id].is_batch_complete()
+        return True
 
 
 queue_manager = QueueManager()

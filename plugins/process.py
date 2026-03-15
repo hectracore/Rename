@@ -836,10 +836,6 @@ class TaskProcessor:
 
                     usage_text = f"Today: {user_files} files · {used_str} used of {limit_str}"
 
-                # Send standalone confirmation msg since status_msg is deleted
-                await self.client.send_message(
-                    self.user_id, f"✅ **Done!** — {usage_text}"
-                )
             except Exception as usage_e:
                 logger.error(
                     f"Error fetching/updating usage for success message: {usage_e}"
@@ -858,6 +854,15 @@ class TaskProcessor:
                 else:
                     queue_manager.update_status(batch_id, item_id, "done_user")
 
+                if queue_manager.is_batch_complete(batch_id):
+                    try:
+                        await self.client.send_message(
+                            self.user_id, f"✅ **Done!** — {usage_text}"
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to send batch completion msg: {e}")
+
+                if dumb_channel:
                     wait_start = time.time()
                     timeout = await db.get_dumb_channel_timeout()
                     wait_msg = None
@@ -917,6 +922,14 @@ class TaskProcessor:
                             f"Failed to copy {final_filename} to dumb channel {dumb_channel}: {e}"
                         )
                         queue_manager.update_status(batch_id, item_id, "failed", str(e))
+
+            elif not batch_id:
+                try:
+                    await self.client.send_message(
+                        self.user_id, f"✅ **Done!** — {usage_text}"
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to send single completion msg: {e}")
 
         except Exception as e:
             logger.error(f"Upload failed: {e}")
