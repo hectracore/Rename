@@ -326,6 +326,7 @@ class TaskProcessor:
                     logger.warning(f"Failed to download poster: {e}")
 
         safe_title = re.sub(r'[\\/*?:"<>|]', "", self.title)
+        safe_title = safe_title.replace("&", "and")
 
         ext = ".mkv" if not self.is_subtitle else ".srt"
         if not self.is_subtitle and self.original_name:
@@ -405,7 +406,8 @@ class TaskProcessor:
                 )
 
             if " " not in template and "." in template:
-                base_name = base_name.replace(" ", ".")
+                base_name = base_name.replace(" ", ".").replace("_", ".")
+            base_name = base_name.replace("..", ".").replace(" .", ".").replace(". ", ".")
 
             final_filename = f"{base_name}{ext}"
             meta_title = self.templates.get("title", "").format(
@@ -431,7 +433,7 @@ class TaskProcessor:
             try:
                 base_name = template.format(**fmt_dict)
                 if " " not in template and "." in template:
-                    base_name = base_name.replace(" ", ".")
+                    base_name = base_name.replace(" ", ".").replace("_", ".")
                 base_name = re.sub(r"\s+", " ", base_name).strip()
                 base_name = (
                     base_name.replace("..", ".").replace(" .", ".").replace(". ", ".")
@@ -446,7 +448,8 @@ class TaskProcessor:
                     else f"{safe_title}.{year_str}.{self.language}"
                 )
                 if " " not in template and "." in template:
-                    base_name = base_name.replace(" ", ".")
+                    base_name = base_name.replace(" ", ".").replace("_", ".")
+                base_name = base_name.replace("..", ".").replace(" .", ".").replace(". ", ".")
 
             final_filename = f"{base_name}{ext}"
             meta_title = (
@@ -805,43 +808,42 @@ class TaskProcessor:
 
             # --- USAGE TRACKING INJECTION ---
             usage_text = ""
-            if Config.PUBLIC_MODE:
-                try:
-                    # Update usage stats using the actual output size
-                    processed_size = os.path.getsize(self.output_path)
-                    await db.update_usage(self.user_id, processed_size)
+            try:
+                # Update usage stats using the actual output size
+                processed_size = os.path.getsize(self.output_path)
+                await db.update_usage(self.user_id, processed_size)
 
-                    # Add usage to success message
-                    usage = await db.get_user_usage(self.user_id)
-                    config = await db.get_public_config()
+                # Add usage to success message
+                usage = await db.get_user_usage(self.user_id)
+                config = await db.get_public_config()
 
-                    daily_egress_mb_limit = config.get("daily_egress_mb", 0)
-                    daily_file_count_limit = config.get("daily_file_count", 0)
+                daily_egress_mb_limit = config.get("daily_egress_mb", 0)
+                daily_file_count_limit = config.get("daily_file_count", 0)
 
-                    user_files = usage.get("file_count", 0)
-                    user_egress_mb = usage.get("egress_mb", 0.0)
+                user_files = usage.get("file_count", 0)
+                user_egress_mb = usage.get("egress_mb", 0.0)
 
-                    if daily_egress_mb_limit <= 0 and daily_file_count_limit <= 0:
-                        usage_text = f"Today: {user_files} files · {user_egress_mb:.2f} MB — No limits set"
-                    else:
-                        limit_str = f"{daily_egress_mb_limit} MB"
-                        if daily_egress_mb_limit >= 1024:
-                            limit_str = f"{daily_egress_mb_limit / 1024:.2f} GB"
+                if daily_egress_mb_limit <= 0 and daily_file_count_limit <= 0:
+                    usage_text = f"Today: {user_files} files · {user_egress_mb:.2f} MB — No limits set"
+                else:
+                    limit_str = f"{daily_egress_mb_limit} MB"
+                    if daily_egress_mb_limit >= 1024:
+                        limit_str = f"{daily_egress_mb_limit / 1024:.2f} GB"
 
-                        used_str = f"{user_egress_mb:.2f} MB"
-                        if user_egress_mb >= 1024:
-                            used_str = f"{user_egress_mb / 1024:.2f} GB"
+                    used_str = f"{user_egress_mb:.2f} MB"
+                    if user_egress_mb >= 1024:
+                        used_str = f"{user_egress_mb / 1024:.2f} GB"
 
-                        usage_text = f"Today: {user_files} files · {used_str} used of {limit_str}"
+                    usage_text = f"Today: {user_files} files · {used_str} used of {limit_str}"
 
-                    # Send standalone confirmation msg since status_msg is deleted
-                    await self.client.send_message(
-                        self.user_id, f"✅ **Done!** — {usage_text}"
-                    )
-                except Exception as usage_e:
-                    logger.error(
-                        f"Error fetching/updating usage for success message: {usage_e}"
-                    )
+                # Send standalone confirmation msg since status_msg is deleted
+                await self.client.send_message(
+                    self.user_id, f"✅ **Done!** — {usage_text}"
+                )
+            except Exception as usage_e:
+                logger.error(
+                    f"Error fetching/updating usage for success message: {usage_e}"
+                )
             # --- END USAGE TRACKING INJECTION ---
 
             await self.status_msg.delete()

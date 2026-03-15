@@ -57,10 +57,9 @@ async def handle_start_command_unique(client, message):
 
     # Check if user is completely new (no usage track yet)
     is_new_user = False
-    if Config.PUBLIC_MODE:
-        user_usage = await db.get_user_usage(user_id)
-        if not user_usage:
-            is_new_user = True
+    user_usage = await db.get_user_usage(user_id)
+    if not user_usage:
+        is_new_user = True
 
     await message.reply_text(
         f"{bot_name}\n\n"
