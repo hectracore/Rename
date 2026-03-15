@@ -221,7 +221,7 @@ debug("✅ Loaded handler: admin_callback")
 
 @Client.on_callback_query(
     filters.regex(
-        r"^(admin_(?!usage_dashboard|dashboard_|block_|unblock_|reset_quota_|broadcast)|edit_template_|edit_fn_template_|prompt_admin_|prompt_public_|prompt_daily_|prompt_fn_template_|prompt_template_|dumb_(?!user_))"
+        r"^(admin_(?!usage_dashboard|dashboard_|block_|unblock_|reset_quota_|broadcast)|edit_template_|edit_fn_template_|prompt_admin_|prompt_public_|prompt_daily_|prompt_global_|prompt_fn_template_|prompt_template_|dumb_(?!user_))"
     )
 )
 async def admin_callback(client, callback_query):
