@@ -10,6 +10,7 @@ logger.info("Loading plugins.start...")
 
 from database import db
 from utils.auth import check_force_sub
+from utils.gate import send_force_sub_gate, check_and_send_welcome
 
 
 @Client.on_message(filters.regex(r"^/(start|new)") & filters.private, group=0)
@@ -24,34 +25,13 @@ async def handle_start_command_unique(client, message):
         bot_name = "**XTV Rename Bot**"
         community_name = "official XTV"
     else:
+        config = await db.get_public_config()
         if not await check_force_sub(client, user_id):
-            config = await db.get_public_config()
-            invite_link = config.get("force_sub_link") or config.get(
-                "force_sub_channel", ""
-            )
-            community_name = config.get("community_name", "Our Community")
-
-            await message.reply_text(
-                f"👋 **Welcome to {community_name}!**\n\n"
-                f"To use the **{config.get('bot_name', 'XTV Rename Bot')}** and all its features, you need to become a member of our community channel first.\n\n"
-                "**How to get started:**\n"
-                "1️⃣ Click the button below to join the channel.\n"
-                "2️⃣ Come back to this bot.\n"
-                "3️⃣ Send or forward any file to start renaming!\n\n"
-                "🔒 *This is required to prevent spam and keep the bot free for everyone.*",
-                reply_markup=InlineKeyboardMarkup(
-                    [
-                        [
-                            InlineKeyboardButton(
-                                "📢 Join Our Community Channel", url=invite_link
-                            )
-                        ]
-                    ]
-                ),
-            )
+            await send_force_sub_gate(client, message, config)
             return
 
-        config = await db.get_public_config()
+        await check_and_send_welcome(client, message, config)
+
         bot_name = f"**{config.get('bot_name', 'XTV Rename Bot')}**"
         community_name = config.get("community_name", "Our Community")
 

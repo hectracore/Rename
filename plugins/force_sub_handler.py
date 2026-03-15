@@ -20,7 +20,7 @@ async def handle_bot_added_to_channel(client, update):
         return
 
     state = admin_sessions.get(user_id)
-    if state != "awaiting_public_force_sub":
+    if state not in ["awaiting_public_force_sub", "awaiting_fs_add_channel"] and not (isinstance(state, str) and state.startswith("awaiting_force_sub_channel_")):
         return
 
     new_status = update.new_chat_member.status if update.new_chat_member else None
@@ -35,24 +35,65 @@ async def handle_bot_added_to_channel(client, update):
             if not invite_link:
                 invite_link = await client.export_chat_invite_link(chat_id)
 
-            await db.update_public_config("force_sub_channel", chat_id)
-            await db.update_public_config("force_sub_link", invite_link)
+            username = chat_info.username
 
-            await client.send_message(
-                chat_id=user_id,
-                text=f"✅ **Force-Sub Setup Complete!**\n\nI successfully detected that you added me to **{chat_title}**.\n\nChannel ID: `{chat_id}`\nSaved Link: {invite_link}",
-                reply_markup=InlineKeyboardMarkup(
-                    [
+            if state == "awaiting_public_force_sub":
+                # Legacy single-channel
+                await db.update_public_config("force_sub_channel", chat_id)
+                await db.update_public_config("force_sub_link", invite_link)
+                await db.update_public_config("force_sub_username", username)
+
+                await client.send_message(
+                    chat_id=user_id,
+                    text=f"✅ **Force-Sub Setup Complete!**\n\nI successfully detected that you added me to **{chat_title}**.\n\nChannel ID: `{chat_id}`\nSaved Link: {invite_link}",
+                    reply_markup=InlineKeyboardMarkup(
                         [
-                            InlineKeyboardButton(
-                                "🔙 Back to Menu", callback_data="admin_main"
-                            )
+                            [
+                                InlineKeyboardButton(
+                                    "🔙 Back to Menu", callback_data="admin_main"
+                                )
+                            ]
                         ]
-                    ]
-                ),
-            )
+                    ),
+                )
+                admin_sessions.pop(user_id, None)
+            else:
+                # Multi-channel setup
+                config = await db.get_public_config()
+                channels = config.get("force_sub_channels", [])
 
-            admin_sessions.pop(user_id, None)
+                new_channel = {
+                    "id": chat_id,
+                    "link": invite_link,
+                    "username": username,
+                    "title": chat_title,
+                    "button_label": f"📢 Join {chat_title}"
+                }
+
+                channels.append(new_channel)
+                await db.update_public_config("force_sub_channels", channels)
+
+                # Keep legacy field populated for backward compat if it's the first channel
+                if len(channels) == 1:
+                    await db.update_public_config("force_sub_channel", chat_id)
+                    await db.update_public_config("force_sub_link", invite_link)
+                    await db.update_public_config("force_sub_username", username)
+
+                await client.send_message(
+                    chat_id=user_id,
+                    text=f"✅ **Force-Sub Channel Added!**\n\nI successfully detected that you added me to **{chat_title}**.\n\nChannel ID: `{chat_id}`\nSaved Link: {invite_link}",
+                    reply_markup=InlineKeyboardMarkup(
+                        [
+                            [
+                                InlineKeyboardButton(
+                                    "🔙 Back to Config", callback_data="admin_force_sub_menu"
+                                )
+                            ]
+                        ]
+                    ),
+                )
+                admin_sessions.pop(user_id, None)
+
 
         except Exception as e:
             logger.error(f"Force sub setup error during chat_member_updated: {e}")
@@ -60,7 +101,7 @@ async def handle_bot_added_to_channel(client, update):
                 chat_id=user_id,
                 text=f"❌ **Failed to verify channel.**\n\nI was added to the channel, but I don't have permission to create invite links. Please grant me the 'Invite Users via Link' permission.",
                 reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton("❌ Cancel", callback_data="admin_main")]]
+                    [[InlineKeyboardButton("❌ Cancel", callback_data="admin_force_sub_menu")]]
                 ),
             )
 

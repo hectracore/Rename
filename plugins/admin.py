@@ -120,7 +120,7 @@ def get_admin_access_limits_menu():
         buttons.append(
             [
                 InlineKeyboardButton(
-                    "📢 Edit Force-Sub Channel", callback_data="admin_public_force_sub"
+                    "📢 Force-Sub Settings", callback_data="admin_force_sub_menu"
                 )
             ]
         )
@@ -560,26 +560,255 @@ async def admin_callback(client, callback_query):
                 pass
             return
 
-        elif data == "admin_public_force_sub":
+        elif data == "admin_force_sub_menu":
             config = await db.get_public_config()
-            current_val = config.get("force_sub_channel", "Not set")
+            channels = config.get("force_sub_channels", [])
+            legacy_ch = config.get("force_sub_channel")
+
+            # Show live preview summary
+            num_channels = len(channels) if channels else (1 if legacy_ch else 0)
+            status = "ON" if num_channels > 0 else "OFF"
+
+            banner_set = "✅ Set" if config.get("force_sub_banner_file_id") else "❌ None"
+            msg_set = "Custom" if config.get("force_sub_message_text") else "Default"
+
+            btn_emoji = config.get("force_sub_button_emoji", "📢")
+            btn_label = config.get("force_sub_button_label", "Join Channel")
+
+            text = (
+                f"📡 **Force-Sub Config**\n"
+                f"Channels: {num_channels} configured\n"
+                f"Banner: {banner_set}\n"
+                f"Message: {msg_set}\n"
+                f"Button: {btn_emoji} {btn_label}\n\n"
+                f"Select an option to configure:"
+            )
+
+            keyboard = [
+                [InlineKeyboardButton(f"📡 Force-Sub: {status}", callback_data="admin_fs_toggle")],
+                [InlineKeyboardButton("➕ Add Channel", callback_data="admin_fs_add_channel"),
+                 InlineKeyboardButton("📋 Manage Channels", callback_data="admin_fs_manage_channels")],
+                [InlineKeyboardButton("🖼 Set Banner", callback_data="admin_fs_set_banner")]
+            ]
+
+            if config.get("force_sub_banner_file_id"):
+                keyboard[-1].append(InlineKeyboardButton("🗑 Remove Banner", callback_data="admin_fs_rem_banner"))
+
+            keyboard.append([
+                InlineKeyboardButton("✏️ Edit Message", callback_data="admin_fs_edit_msg"),
+                InlineKeyboardButton("↩️ Reset Message", callback_data="admin_fs_reset_msg")
+            ])
+            keyboard.append([
+                InlineKeyboardButton("🔘 Edit Button", callback_data="admin_fs_edit_btn"),
+                InlineKeyboardButton("🎉 Edit Welcome Msg", callback_data="admin_fs_edit_welcome")
+            ])
+            keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="admin_access_limits")])
+
             try:
                 await callback_query.message.edit_text(
-                    f"📢 **Edit Force-Sub Channel**\n\nCurrent: `{current_val}`\n\nClick below to change it.",
+                    text,
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+            except MessageNotModified:
+                pass
+            return
+
+        elif data == "admin_fs_add_channel":
+            admin_sessions[user_id] = "awaiting_fs_add_channel"
+            try:
+                await callback_query.message.edit_text(
+                    "📢 **Add Force-Sub Channel**\n\n"
+                    "⏳ **I am waiting...**\n\n"
+                    "Simply **add me as an Administrator** to your desired channel right now!\n"
+                    "Make sure I have the 'Invite Users via Link' permission.\n\n"
+                    "I will automatically detect the channel and set it up instantly.\n\n"
+                    "*Send /cancel to cancel.*",
                     reply_markup=InlineKeyboardMarkup(
-                        [
-                            [
-                                InlineKeyboardButton(
-                                    "✏️ Change", callback_data="prompt_public_force_sub"
-                                )
-                            ],
-                            [
-                                InlineKeyboardButton(
-                                    "← Back", callback_data="admin_access_limits"
-                                )
-                            ],
-                        ]
-                    ),
+                        [[InlineKeyboardButton("❌ Cancel", callback_data="admin_force_sub_menu")]]
+                    )
+                )
+            except MessageNotModified:
+                pass
+            return
+
+        elif data == "admin_fs_toggle":
+            config = await db.get_public_config()
+            channels = config.get("force_sub_channels", [])
+            legacy_ch = config.get("force_sub_channel")
+            num_channels = len(channels) if channels else (1 if legacy_ch else 0)
+
+            if num_channels > 0:
+                await db.update_public_config("force_sub_channels", [])
+                await db.update_public_config("force_sub_channel", None)
+                await db.update_public_config("force_sub_link", None)
+                await db.update_public_config("force_sub_username", None)
+                await callback_query.answer("Force-Sub disabled.", show_alert=True)
+            else:
+                await callback_query.answer("Please add a channel to enable Force-Sub.", show_alert=True)
+
+            callback_query.data = "admin_force_sub_menu"
+            await admin_callback(client, callback_query)
+            return
+
+        elif data == "admin_fs_manage_channels":
+            config = await db.get_public_config()
+            channels = config.get("force_sub_channels", [])
+            legacy_ch = config.get("force_sub_channel")
+            legacy_link = config.get("force_sub_link")
+            legacy_username = config.get("force_sub_username")
+
+            if not channels and legacy_ch:
+                channels = [{"id": legacy_ch, "link": legacy_link, "username": legacy_username, "title": "Legacy Channel"}]
+
+            if not channels:
+                await callback_query.answer("No channels configured.", show_alert=True)
+                return
+
+            keyboard = []
+            for i, ch in enumerate(channels):
+                title = ch.get("title", f"Channel {i+1}")
+                keyboard.append([InlineKeyboardButton(f"❌ Remove {title}", callback_data=f"admin_fs_rem_ch_{i}")])
+
+            keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="admin_force_sub_menu")])
+
+            try:
+                await callback_query.message.edit_text(
+                    "📋 **Manage Channels**\n\nSelect a channel to remove:",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+            except MessageNotModified:
+                pass
+            return
+
+        elif data.startswith("admin_fs_rem_ch_"):
+            idx = int(data.replace("admin_fs_rem_ch_", ""))
+            config = await db.get_public_config()
+            channels = config.get("force_sub_channels", [])
+            legacy_ch = config.get("force_sub_channel")
+
+            if not channels and legacy_ch:
+                channels = [{"id": legacy_ch, "link": config.get("force_sub_link"), "username": config.get("force_sub_username"), "title": "Legacy Channel"}]
+
+            if 0 <= idx < len(channels):
+                channels.pop(idx)
+                await db.update_public_config("force_sub_channels", channels)
+
+                # Update legacy if needed
+                if len(channels) > 0:
+                    await db.update_public_config("force_sub_channel", channels[0].get("id"))
+                    await db.update_public_config("force_sub_link", channels[0].get("link"))
+                    await db.update_public_config("force_sub_username", channels[0].get("username"))
+                else:
+                    await db.update_public_config("force_sub_channel", None)
+                    await db.update_public_config("force_sub_link", None)
+                    await db.update_public_config("force_sub_username", None)
+
+                await callback_query.answer("Channel removed.", show_alert=True)
+
+            callback_query.data = "admin_fs_manage_channels"
+            await admin_callback(client, callback_query)
+            return
+
+        elif data == "admin_fs_set_banner":
+            admin_sessions[user_id] = "awaiting_fs_banner"
+            try:
+                await callback_query.message.edit_text(
+                    "🖼 **Send me a photo** to use as the Force-Sub gate banner.\n\nSend /cancel to keep the current one.",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="admin_force_sub_menu")]])
+                )
+            except MessageNotModified:
+                pass
+            return
+
+        elif data == "admin_fs_rem_banner":
+            await db.update_public_config("force_sub_banner_file_id", None)
+            await callback_query.answer("Banner removed.", show_alert=True)
+            callback_query.data = "admin_force_sub_menu"
+            await admin_callback(client, callback_query)
+            return
+
+        elif data == "admin_fs_edit_msg":
+            config = await db.get_public_config()
+            current_msg = config.get("force_sub_message_text")
+
+            text = "✏️ **Edit Gate Message**\n\nCurrent:\n"
+            if current_msg:
+                text += f"`{current_msg}`\n\n"
+            else:
+                text += "*Default Message*\n\n"
+
+            text += "Send your new gate message. You can use `{channel}`, `{bot_name}`, `{community}`.\nSend /cancel to keep the current one."
+
+            admin_sessions[user_id] = "awaiting_fs_msg"
+            try:
+                await callback_query.message.edit_text(
+                    text,
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="admin_force_sub_menu")]])
+                )
+            except MessageNotModified:
+                pass
+            return
+
+        elif data == "admin_fs_reset_msg":
+            await db.update_public_config("force_sub_message_text", None)
+            await callback_query.answer("Message reset to default.", show_alert=True)
+            callback_query.data = "admin_force_sub_menu"
+            await admin_callback(client, callback_query)
+            return
+
+        elif data == "admin_fs_edit_btn":
+            try:
+                await callback_query.message.edit_text(
+                    "🔘 **Edit Button**\n\nSelect what to edit:",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🔘 Edit Label", callback_data="admin_fs_btn_label"),
+                         InlineKeyboardButton("😀 Edit Emoji", callback_data="admin_fs_btn_emoji")],
+                        [InlineKeyboardButton("↩️ Reset Button", callback_data="admin_fs_btn_reset")],
+                        [InlineKeyboardButton("🔙 Back", callback_data="admin_force_sub_menu")]
+                    ])
+                )
+            except MessageNotModified:
+                pass
+            return
+
+        elif data == "admin_fs_btn_label":
+            admin_sessions[user_id] = "awaiting_fs_btn_label"
+            try:
+                await callback_query.message.edit_text(
+                    "🔘 **Edit Button Label**\n\nSend the new label text (without emoji):",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="admin_fs_edit_btn")]])
+                )
+            except MessageNotModified:
+                pass
+            return
+
+        elif data == "admin_fs_btn_emoji":
+            admin_sessions[user_id] = "awaiting_fs_btn_emoji"
+            try:
+                await callback_query.message.edit_text(
+                    "😀 **Edit Button Emoji**\n\nSend a single emoji character:",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="admin_fs_edit_btn")]])
+                )
+            except MessageNotModified:
+                pass
+            return
+
+        elif data == "admin_fs_btn_reset":
+            await db.update_public_config("force_sub_button_label", None)
+            await db.update_public_config("force_sub_button_emoji", None)
+            await callback_query.answer("Button reset to default.", show_alert=True)
+            callback_query.data = "admin_force_sub_menu"
+            await admin_callback(client, callback_query)
+            return
+
+        elif data == "admin_fs_edit_welcome":
+            admin_sessions[user_id] = "awaiting_fs_welcome"
+            config = await db.get_public_config()
+            current_msg = config.get("force_sub_welcome_text", "✅ Welcome aboard! You're all set. Send your file and let's go.")
+            try:
+                await callback_query.message.edit_text(
+                    f"🎉 **Edit Welcome Message**\n\nCurrent:\n`{current_msg}`\n\nSend the new welcome message text:",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="admin_force_sub_menu")]])
                 )
             except MessageNotModified:
                 pass
@@ -654,7 +883,7 @@ async def admin_callback(client, callback_query):
                 "Simply **add me as an Administrator** to your desired channel right now!\n"
                 "Make sure I have the 'Invite Users via Link' permission.\n\n"
                 "I will automatically detect the channel and set it up instantly.\n\n"
-                "*Send `disable` to cancel and turn off Force-Sub.*"
+                "*Send /cancel to cancel.*"
             )
         elif field == "daily_egress":
             text = "📦 **Send the new daily egress limit in MB (e.g., 2048).**\nSend `0` to disable."
@@ -1200,7 +1429,26 @@ from pyrogram import ContinuePropagation
 @Client.on_message(filters.photo & filters.private, group=1)
 async def handle_admin_photo(client, message):
     user_id = message.from_user.id
-    if not is_admin(user_id) or admin_sessions.get(user_id) != "awaiting_thumb":
+    if not is_admin(user_id):
+        raise ContinuePropagation
+
+    state = admin_sessions.get(user_id)
+    if state == "awaiting_fs_banner":
+        try:
+            file_id = message.photo.file_id
+            await db.update_public_config("force_sub_banner_file_id", file_id)
+            await message.reply_photo(
+                file_id,
+                caption="✅ Banner updated successfully! It will appear like this.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to Menu", callback_data="admin_force_sub_menu")]])
+            )
+            admin_sessions.pop(user_id, None)
+        except Exception as e:
+            logger.error(f"Gate banner upload failed: {e}")
+            await message.reply_text(f"❌ Error: {e}")
+        return
+
+    if state != "awaiting_thumb":
         raise ContinuePropagation
 
     msg = await message.reply_text("Processing thumbnail...")
@@ -1432,34 +1680,20 @@ async def handle_admin_text(client, message):
                 ),
             )
         elif field == "force_sub":
-            if val.lower() == "disable":
-                await db.update_public_config("force_sub_channel", None)
-                await db.update_public_config("force_sub_link", None)
-                await message.reply_text(
-                    "✅ Force-Sub disabled.",
-                    reply_markup=InlineKeyboardMarkup(
-                        [
-                            [
-                                InlineKeyboardButton(
-                                    "🔙 Back to Menu", callback_data="admin_main"
-                                )
-                            ]
-                        ]
-                    ),
-                )
+            if val.lower() == "/cancel":
                 admin_sessions.pop(user_id, None)
+                await message.reply_text(
+                    "Cancelled.",
+                    reply_markup=InlineKeyboardMarkup(
+                        [[InlineKeyboardButton("🔙 Back to Config", callback_data="admin_force_sub_menu")]]
+                    )
+                )
             else:
                 await message.reply_text(
-                    "⏳ **Still Waiting...**\n\nPlease add me as an Admin to the channel, or type `disable` to cancel.",
+                    "⏳ **Still Waiting...**\n\nPlease add me as an Admin to the channel, or type `/cancel` to abort.",
                     reply_markup=InlineKeyboardMarkup(
-                        [
-                            [
-                                InlineKeyboardButton(
-                                    "❌ Cancel", callback_data="admin_main"
-                                )
-                            ]
-                        ]
-                    ),
+                        [[InlineKeyboardButton("❌ Cancel", callback_data="admin_force_sub_menu")]]
+                    )
                 )
             return
         elif field == "rate_limit":
@@ -1545,6 +1779,45 @@ async def handle_admin_text(client, message):
                         ]
                     ]
                 ),
+            )
+
+        admin_sessions.pop(user_id, None)
+        return
+
+    if state.startswith("awaiting_fs_"):
+        val = message.text.strip() if message.text else ""
+        if val == "/cancel":
+            admin_sessions.pop(user_id, None)
+            await message.reply_text("Cancelled.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to Menu", callback_data="admin_force_sub_menu")]]))
+            return
+
+        field = state.replace("awaiting_fs_", "")
+
+        if field == "msg":
+            await db.update_public_config("force_sub_message_text", val)
+            await message.reply_text(
+                "✅ Gate message updated successfully.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="admin_force_sub_menu")]])
+            )
+        elif field == "btn_label":
+            await db.update_public_config("force_sub_button_label", val)
+            await message.reply_text(
+                f"✅ Button label updated to `{val}`.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="admin_fs_edit_btn")]])
+            )
+        elif field == "btn_emoji":
+            # Just take the first character in case they sent a word with emoji
+            emoji = val[0] if val else "📢"
+            await db.update_public_config("force_sub_button_emoji", emoji)
+            await message.reply_text(
+                f"✅ Button emoji updated to {emoji}.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="admin_fs_edit_btn")]])
+            )
+        elif field == "welcome":
+            await db.update_public_config("force_sub_welcome_text", val)
+            await message.reply_text(
+                "✅ Welcome message updated successfully.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="admin_force_sub_menu")]])
             )
 
         admin_sessions.pop(user_id, None)

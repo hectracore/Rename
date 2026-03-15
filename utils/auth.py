@@ -2,7 +2,7 @@ from pyrogram import filters
 from config import Config
 
 from database import db
-from pyrogram.errors import UserNotParticipant
+from pyrogram.errors import UserNotParticipant, PeerIdInvalid
 from utils.log import get_logger
 
 logger = get_logger("utils.auth")
@@ -26,21 +26,46 @@ async def check_force_sub(client, user_id):
         return True
 
     config = await db.get_public_config()
-    force_sub_channel = config.get("force_sub_channel")
+    force_sub_channels = config.get("force_sub_channels", [])
+    legacy_channel = config.get("force_sub_channel")
 
-    if not force_sub_channel:
+    channels_to_check = []
+    if force_sub_channels:
+        for ch in force_sub_channels:
+            if ch.get("id"):
+                channels_to_check.append(ch["id"])
+    elif legacy_channel:
+        channels_to_check.append(legacy_channel)
+
+    if not channels_to_check:
         return True
 
-    try:
-        await client.get_chat_member(force_sub_channel, user_id)
-        return True
-    except UserNotParticipant:
-        return False
-    except Exception as e:
-        logger.error(
-            f"Error checking force sub for {user_id} in {force_sub_channel}: {e}"
-        )
-        return False
+    for channel in channels_to_check:
+        try:
+            await client.get_chat_member(channel, user_id)
+        except UserNotParticipant:
+            return False
+        except PeerIdInvalid:
+            # Try to resolve via get_chat fallback
+            try:
+                await client.get_chat(channel)
+                await client.get_chat_member(channel, user_id)
+            except UserNotParticipant:
+                return False
+            except Exception as e:
+                logger.error(
+                    f"Error checking force sub for {user_id} in {channel} (after get_chat fallback): {e}"
+                )
+                # Fail open
+                continue
+        except Exception as e:
+            logger.error(
+                f"Error checking force sub for {user_id} in {channel}: {e}"
+            )
+            # Fail open
+            continue
+
+    return True
 
 
 auth_filter = filters.create(

@@ -1113,6 +1113,7 @@ from utils.auth import check_force_sub
 from database import db
 from utils.queue_manager import queue_manager
 import uuid
+from utils.gate import send_force_sub_gate, check_and_send_welcome
 
 
 @Client.on_message(
@@ -1378,30 +1379,12 @@ async def handle_file_upload(client, message):
         if not (user_id == Config.CEO_ID or user_id in Config.ADMIN_IDS):
             return
     else:
+        config = await db.get_public_config()
         if not await check_force_sub(client, user_id):
-            config = await db.get_public_config()
-            invite_link = config.get("force_sub_link") or config.get(
-                "force_sub_channel", ""
-            )
-
-            await message.reply_text(
-                f"⚠️ **Access Restricted**\n\n"
-                f"You must join our community channel to use the **{config.get('bot_name', 'XTV Rename Bot')}**.\n\n"
-                "**How to continue:**\n"
-                "1️⃣ Click the button below to join the channel.\n"
-                "2️⃣ Come back here.\n"
-                "3️⃣ Send or forward your file again!\n",
-                reply_markup=InlineKeyboardMarkup(
-                    [
-                        [
-                            InlineKeyboardButton(
-                                "📢 Join Our Community Channel", url=invite_link
-                            )
-                        ]
-                    ]
-                ),
-            )
+            await send_force_sub_gate(client, message, config)
             return
+
+        await check_and_send_welcome(client, message, config)
 
     if await db.is_user_blocked(user_id):
         await message.reply_text(

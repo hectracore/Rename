@@ -54,14 +54,40 @@ if __name__ == "__main__":
 
     try:
         from database import db
+        import asyncio
 
         async def cache_channels():
             links = await db.get_all_dumb_channel_links()
-            for link in links:
+            tasks = []
+
+            async def cache_link(link):
                 try:
                     await app.get_chat(link)
-                except Exception as e:
+                except Exception:
                     pass
+
+            for link in links:
+                tasks.append(cache_link(link))
+
+            config = await db.get_public_config()
+            force_sub_channels = config.get("force_sub_channels", [])
+            legacy_ch = config.get("force_sub_channel")
+
+            async def cache_id(ch_id):
+                try:
+                    await app.get_chat(ch_id)
+                except Exception:
+                    pass
+
+            if force_sub_channels:
+                for ch in force_sub_channels:
+                    if ch.get("id"):
+                        tasks.append(cache_id(ch["id"]))
+            elif legacy_ch:
+                tasks.append(cache_id(legacy_ch))
+
+            if tasks:
+                await asyncio.gather(*tasks)
 
         logger.info("Caching Channel peers...")
         app.loop.run_until_complete(cache_channels())

@@ -78,23 +78,22 @@ async def info_command(client, message):
     community_name = config.get("community_name", "Our Community")
     support_contact = config.get("support_contact", "@davdxpx")
 
-    force_sub_channel = config.get("force_sub_channel")
-    channel_link = (
-        force_sub_channel
-        if (
-            force_sub_channel
-            and isinstance(force_sub_channel, str)
-            and force_sub_channel.startswith("http")
-        )
-        else None
-    )
+    force_sub_channels = config.get("force_sub_channels", [])
+    legacy_channel = config.get("force_sub_channel")
+    channel_link = None
 
-    if not channel_link and force_sub_channel:
-        try:
-            chat_info = await client.get_chat(force_sub_channel)
-            channel_link = chat_info.invite_link or f"https://t.me/{chat_info.username}"
-        except:
-            channel_link = "Not configured"
+    if force_sub_channels:
+        channel_link = force_sub_channels[0].get("link")
+        if not channel_link and force_sub_channels[0].get("username"):
+            channel_link = f"https://t.me/{force_sub_channels[0].get('username')}"
+    elif legacy_channel:
+        channel_link = config.get("force_sub_link")
+        if not channel_link:
+            try:
+                chat_info = await client.get_chat(legacy_channel)
+                channel_link = chat_info.invite_link or f"https://t.me/{chat_info.username}"
+            except:
+                pass
 
     if not channel_link:
         channel_link = "Not configured"
