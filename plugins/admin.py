@@ -992,11 +992,11 @@ async def handle_admin_text(client, message):
             except Exception:
                 await message.reply_text("❌ Could not find a user with that ID or username. Please make sure the ID is correct.",
                                         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_usage_dashboard")]]))
-                await clear_session(message.from_user.id)
+                clear_session(message.from_user.id)
                 return
 
         await show_user_lookup(client, message, user_id)
-        await clear_session(message.from_user.id)
+        clear_session(message.from_user.id)
         return
 
     if state == "awaiting_dumb_timeout":
@@ -1468,11 +1468,42 @@ async def show_user_lookup(client: Client, message: Message, user_id: int):
         name = "Unknown User"
         username = "N/A"
 
+    user_settings = await db.get_settings(user_id)
+    joined_date = "Unknown"
+
+    # Check if there is a document at all
+    has_thumb = "No"
+    current_template = "Default"
+
+    if user_settings:
+        if user_settings.get("thumbnail_file_id") or user_settings.get("thumbnail_binary"):
+            has_thumb = "Yes"
+
+        templates = user_settings.get("templates", {})
+        if templates and templates.get("caption") != "{random}":
+            current_template = "Custom"
+
+        # Try to extract joined date from ObjectID if available, else from usage.date
+        _id = user_settings.get("_id")
+        if _id:
+            try:
+                # ObjectId contains a timestamp
+                import bson
+                if isinstance(_id, bson.ObjectId):
+                    joined_date = _id.generation_time.strftime("%d %b %Y")
+                else:
+                    joined_date = usage.get("date", "Unknown")
+            except Exception:
+                joined_date = usage.get("date", "Unknown")
+
     text = (
         f"👤 **User Lookup**\n\n"
         f"**ID:** `{user_id}`\n"
         f"**Name:** {name}\n"
         f"**Username:** {username}\n"
+        f"**Joined:** {joined_date}\n"
+        f"**Template:** {current_template}\n"
+        f"**Custom Thumb:** {has_thumb}\n"
         f"──────────────────────────\n"
         f"📊 **Today ({current_date_display})**\n"
         f"Files: `{files_today}`\n"
@@ -1531,13 +1562,13 @@ async def admin_prompt_lookup_cb(client: Client, callback_query: CallbackQuery):
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_usage_dashboard")]])
     )
     from utils.state import set_state
-    await set_state(callback_query.from_user.id, "awaiting_user_lookup")
+    set_state(callback_query.from_user.id, "awaiting_user_lookup")
 
 
 @Client.on_message(filters.text & filters.private & filters.user(Config.CEO_ID), group=2)
 async def admin_handle_user_lookup_text(client: Client, message: Message):
     from utils.state import get_state, clear_session
-    state = await get_state(message.from_user.id)
+    state = get_state(message.from_user.id)
 
     if state == "awaiting_user_lookup":
         val = message.text.strip()
@@ -1553,9 +1584,9 @@ async def admin_handle_user_lookup_text(client: Client, message: Message):
             except Exception:
                 await message.reply_text("❌ Could not find a user with that ID or username. Please make sure the ID is correct.",
                                         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_usage_dashboard")]]))
-                await clear_session(message.from_user.id)
+                clear_session(message.from_user.id)
                 return
 
         await show_user_lookup(client, message, user_id)
-        await clear_session(message.from_user.id)
+        clear_session(message.from_user.id)
         raise ContinuePropagation

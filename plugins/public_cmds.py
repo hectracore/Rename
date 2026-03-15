@@ -870,8 +870,10 @@ async def handle_user_text(client, message):
 # Contact on Telegram @davdxpx
 # --------------------------------------------------------------------------
 
-@Client.on_message(filters.command("usage") & filters.private & filters.create(is_public_mode), group=0)
+@Client.on_message(filters.command("usage") & filters.private, group=0)
 async def usage_command(client, message):
+    if not is_public_mode():
+        return
     user_id = message.from_user.id
 
     # Bypass limits for CEO/Admins visually
@@ -928,9 +930,9 @@ async def usage_command(client, message):
         max_percent = 100
 
     # Generate progress bar using block characters
-    # 10 blocks total
-    filled_blocks = int(max_percent / 10)
-    empty_blocks = 10 - filled_blocks
+    # 12 blocks total
+    filled_blocks = int((max_percent / 100) * 12)
+    empty_blocks = 12 - filled_blocks
     progress_bar = ("█" * filled_blocks) + ("░" * empty_blocks)
 
     text = (
