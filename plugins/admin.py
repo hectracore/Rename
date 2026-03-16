@@ -202,9 +202,9 @@ async def admin_panel(client, message):
         )
     else:
         text = (
-            "🛠 **XTV Admin Panel** 🛠\n\n"
+            "🛠 **𝕏TV Admin Panel** 🛠\n\n"
             "Welcome, CEO.\n"
-            "Manage global settings for the XTV Rename Bot.\n"
+            "Manage global settings for the 𝕏TV Rename Bot.\n"
             "These settings affect all files processed by the bot."
         )
 
@@ -1352,9 +1352,9 @@ async def admin_callback(client, callback_query):
         else:
             try:
                 await callback_query.message.edit_text(
-                    "🛠 **XTV Admin Panel** 🛠\n\n"
+                    "🛠 **𝕏TV Admin Panel** 🛠\n\n"
                     "Welcome, CEO.\n"
-                    "Manage global settings for the XTV Rename Bot.\n"
+                    "Manage global settings for the 𝕏TV Rename Bot.\n"
                     "These settings affect all files processed by the bot.",
                     reply_markup=get_admin_main_menu(pro_session, Config.PUBLIC_MODE),
                 )

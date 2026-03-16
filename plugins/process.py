@@ -201,7 +201,7 @@ class TaskProcessor:
 
                 channel = await self.active_client.create_channel(
                     title=f"𝕏TV Pro Ephemeral {self.message_id}",
-                    description="Temporary tunnel for XTV Bot.",
+                    description="Temporary tunnel for 𝕏TV Bot.",
                 )
                 self.tunnel_id = channel.id
 

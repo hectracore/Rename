@@ -291,7 +291,7 @@ class Database:
             if not doc:
                 default_config = {
                     "_id": "public_mode_config",
-                    "bot_name": "XTV Rename Bot",
+                    "bot_name": "𝕏TV Rename Bot",
                     "community_name": "Our Community",
                     "support_contact": "@davdxpx",
                     "force_sub_channel": None,

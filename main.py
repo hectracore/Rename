@@ -3,7 +3,7 @@
 ║                    Developed by 𝕏0L0™ (@davdxpx)                         ║
 ║     © 2026 XTV Network Global. All Rights Reserved.                      ║
 ║                                                                          ║
-║  Project: XTV Rename Bot                                                 ║
+║  Project: 𝕏TV Rename Bot                                                 ║
 ║  Author: 𝕏0L0™                                                           ║
 ║  Telegram: @davdxpx                                                      ║
 ║  Channel: @XTVbots                                                       ║
@@ -40,7 +40,7 @@ if __name__ == "__main__":
         logger.error("BOT_TOKEN is not set!")
         exit(1)
 
-    logger.info("Starting XTV Rename Bot...")
+    logger.info("Starting 𝕏TV Rename Bot...")
     app.start()
 
     try:

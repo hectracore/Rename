@@ -22,7 +22,7 @@ async def handle_start_command_unique(client, message):
         if not (user_id == Config.CEO_ID or user_id in Config.ADMIN_IDS):
             logger.warning(f"Unauthorized access by {user_id}")
             return
-        bot_name = "**XTV Rename Bot**"
+        bot_name = "**𝕏TV Rename Bot**"
         community_name = "official XTV"
     else:
         config = await db.get_public_config()
