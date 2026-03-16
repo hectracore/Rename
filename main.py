@@ -40,34 +40,7 @@ if __name__ == "__main__":
         logger.error("BOT_TOKEN is not set!")
         exit(1)
 
-    # Print stylish startup banner
-    admins_count = len(Config.ADMIN_IDS)
-    tmdb_status = "✅ Configured" if Config.TMDB_API_KEY else "❌ Missing"
-    db_status = "✅ Configured" if Config.MAIN_URI else "❌ Missing"
-
-    startup_msg = (
-        f"\n{'='*60}\n"
-        f"🚀 𝕏TV Rename Bot {Config.VERSION} Initialization\n"
-        f"{'-'*60}\n"
-        f"⚙️  Core Settings:\n"
-        f"   • Debug Mode  : {'🟢 ON' if Config.DEBUG_MODE else '🔴 OFF'}\n"
-        f"   • Public Mode : {'🟢 ON' if Config.PUBLIC_MODE else '🔴 OFF'}\n"
-        f"\n"
-        f"👥 Access Control:\n"
-        f"   • CEO ID      : {Config.CEO_ID if Config.CEO_ID else 'Not Set'}\n"
-        f"   • Admins      : {admins_count} configured\n"
-        f"\n"
-        f"🔗 Integrations:\n"
-        f"   • Database    : {db_status}\n"
-        f"   • TMDb API    : {tmdb_status}\n"
-        f"\n"
-        f"📁 Storage:\n"
-        f"   • Down Dir    : ./{Config.DOWNLOAD_DIR}\n"
-        f"   • Def Channel : {Config.DEFAULT_CHANNEL}\n"
-        f"{'='*60}"
-    )
-    logger.info(startup_msg)
-
+    logger.info("Starting XTV Rename Bot...")
     app.start()
 
     try:
@@ -121,7 +94,35 @@ if __name__ == "__main__":
         logger.error(f"Failed to initialize Userbot from DB: {e}")
         app.user_bot = None
 
-    logger.info("Bot Started!")
+    # Print stylish startup banner at the end so it's the last thing seen
+    admins_count = len(Config.ADMIN_IDS)
+    tmdb_status = "✅ Configured" if Config.TMDB_API_KEY else "❌ Missing"
+    db_status = "✅ Configured" if Config.MAIN_URI else "❌ Missing"
+    xtv_pro_status = "🟢 Enabled (4GB Support)" if app.user_bot else "🔴 Disabled (2GB Limit)"
+
+    startup_msg = (
+        f"\n{'='*60}\n"
+        f"🚀 𝕏TV Rename Bot {Config.VERSION} Initialization\n"
+        f"{'-'*60}\n"
+        f"⚙️  Core Settings:\n"
+        f"   • Debug Mode  : {'🟢 ON' if Config.DEBUG_MODE else '🔴 OFF'}\n"
+        f"   • Public Mode : {'🟢 ON' if Config.PUBLIC_MODE else '🔴 OFF'}\n"
+        f"   • 𝕏TV Pro™    : {xtv_pro_status}\n"
+        f"\n"
+        f"👥 Access Control:\n"
+        f"   • CEO ID      : {Config.CEO_ID if Config.CEO_ID else 'Not Set'}\n"
+        f"   • Admins      : {admins_count} configured\n"
+        f"\n"
+        f"🔗 Integrations:\n"
+        f"   • Database    : {db_status}\n"
+        f"   • TMDb API    : {tmdb_status}\n"
+        f"\n"
+        f"📁 Storage:\n"
+        f"   • Down Dir    : ./{Config.DOWNLOAD_DIR}\n"
+        f"   • Def Channel : {Config.DEFAULT_CHANNEL}\n"
+        f"{'='*60}"
+    )
+    logger.info(startup_msg)
     idle()
 
     if user_bot:
