@@ -90,6 +90,9 @@ async def handle_rename_command(client, message):
             self.from_user = message.from_user
             self.data = "start_renaming"
 
+        async def answer(self, *args, **kwargs):
+            pass
+
     mock_cb = MockCallbackQuery(message)
     msg = await message.reply_text("Loading menu...")
     mock_cb.message = msg
@@ -110,6 +113,9 @@ async def handle_general_command(client, message):
             self.message = message
             self.from_user = message.from_user
             self.data = "type_general"
+
+        async def answer(self, *args, **kwargs):
+            pass
 
     mock_cb = MockCallbackQuery(message)
     msg = await message.reply_text("Loading general mode...")
@@ -132,6 +138,9 @@ async def handle_audio_command(client, message):
             self.from_user = message.from_user
             self.data = "audio_editor_menu"
 
+        async def answer(self, *args, **kwargs):
+            pass
+
     mock_cb = MockCallbackQuery(message)
     msg = await message.reply_text("Loading audio editor...")
     mock_cb.message = msg
@@ -152,6 +161,9 @@ async def handle_personal_command(client, message):
             self.message = message
             self.from_user = message.from_user
             self.data = "type_personal_file"
+
+        async def answer(self, *args, **kwargs):
+            pass
 
     mock_cb = MockCallbackQuery(message)
     msg = await message.reply_text("Loading personal mode...")
@@ -174,6 +186,9 @@ async def handle_convert_command(client, message):
             self.from_user = message.from_user
             self.data = "file_converter_menu"
 
+        async def answer(self, *args, **kwargs):
+            pass
+
     mock_cb = MockCallbackQuery(message)
     msg = await message.reply_text("Loading converter...")
     mock_cb.message = msg
@@ -194,6 +209,9 @@ async def handle_watermark_command(client, message):
             self.message = message
             self.from_user = message.from_user
             self.data = "watermarker_menu"
+
+        async def answer(self, *args, **kwargs):
+            pass
 
     mock_cb = MockCallbackQuery(message)
     msg = await message.reply_text("Loading watermarker...")

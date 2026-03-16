@@ -944,6 +944,9 @@ async def handle_user_text(client, message):
         )
         user_sessions.pop(user_id, None)
 
+    else:
+        raise ContinuePropagation
+
 
 async def _send_usage(client, target, user_id, is_callback=False):
     is_admin_user = (user_id == Config.CEO_ID or user_id in Config.ADMIN_IDS)

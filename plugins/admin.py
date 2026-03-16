@@ -1862,6 +1862,9 @@ async def handle_admin_text(client, message):
         )
         admin_sessions.pop(user_id, None)
 
+    else:
+        raise ContinuePropagation
+
 debug("✅ Loaded handler: admin_dashboard_overview_cb")
 
 
