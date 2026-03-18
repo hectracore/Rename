@@ -1883,9 +1883,10 @@ async def admin_dashboard_overview_cb(client: Client, callback_query: CallbackQu
 
     active_slots = 0
     for phase in ["download", "process", "upload"]:
-        if _SEMAPHORES.get(phase):
-            # value of semaphore is internal counter. Max is 3. So acquired = 3 - value
-            active_slots += 3 - _SEMAPHORES[phase]._value
+        for user_sems in _SEMAPHORES.values():
+            if phase in user_sems and user_sems[phase] is not None:
+                # value of semaphore is internal counter. Max is 3. So acquired = 3 - value
+                active_slots += 3 - user_sems[phase]._value
 
     # Format egress strings
     def format_egress(mb):
