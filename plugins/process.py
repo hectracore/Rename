@@ -22,13 +22,17 @@ from utils.queue_manager import queue_manager
 
 logger = logging.getLogger("TaskProcessor")
 
-_SEMAPHORES = {"download": None, "process": None, "upload": None}
+_SEMAPHORES: Dict[int, Dict[str, Optional[asyncio.Semaphore]]] = {}
 
 
-def get_semaphore(phase: str) -> asyncio.Semaphore:
-    if _SEMAPHORES[phase] is None:
-        _SEMAPHORES[phase] = asyncio.Semaphore(3)
-    return _SEMAPHORES[phase]
+def get_semaphore(user_id: int, phase: str) -> asyncio.Semaphore:
+    if user_id not in _SEMAPHORES:
+        _SEMAPHORES[user_id] = {"download": None, "process": None, "upload": None}
+
+    if _SEMAPHORES[user_id][phase] is None:
+        _SEMAPHORES[user_id][phase] = asyncio.Semaphore(3)
+
+    return _SEMAPHORES[user_id][phase]
 
 
 class TaskProcessor:
@@ -98,16 +102,16 @@ class TaskProcessor:
             if not await self._initialize():
                 return
 
-            async with get_semaphore("download"):
+            async with get_semaphore(self.user_id, "download"):
                 if not await self._download_media():
                     return
 
-            async with get_semaphore("process"):
+            async with get_semaphore(self.user_id, "process"):
                 await self._prepare_resources()
                 if not await self._process_media():
                     return
 
-            async with get_semaphore("upload"):
+            async with get_semaphore(self.user_id, "upload"):
                 await self._upload_media()
 
         except Exception as e:
