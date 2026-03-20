@@ -130,57 +130,72 @@ class TaskProcessor:
         finally:
             await self._cleanup()
             if batch_id and queue_manager.is_batch_complete(batch_id):
-                try:
-                    usage = await db.get_user_usage(self.user_id)
-                    config = await db.get_public_config()
-                    daily_egress_mb_limit = config.get("daily_egress_mb", 0)
-                    daily_file_count_limit = config.get("daily_file_count", 0)
-                    global_limit_mb = await db.get_global_daily_egress_limit()
+                if not getattr(queue_manager.batches.get(batch_id), "summary_sent", False):
+                    try:
+                        usage = await db.get_user_usage(self.user_id)
+                        config = await db.get_public_config()
+                        daily_egress_mb_limit = config.get("daily_egress_mb", 0)
+                        daily_file_count_limit = config.get("daily_file_count", 0)
+                        global_limit_mb = await db.get_global_daily_egress_limit()
 
-                    user_files = usage.get("file_count", 0)
-                    user_egress_mb = usage.get("egress_mb", 0.0)
+                        user_files = usage.get("file_count", 0)
+                        user_egress_mb = usage.get("egress_mb", 0.0)
 
-                    if self.user_id == Config.CEO_ID or self.user_id in Config.ADMIN_IDS:
-                        if global_limit_mb > 0:
-                            limit_str = f"{global_limit_mb} MB"
-                            if global_limit_mb >= 1024:
-                                limit_str = f"{global_limit_mb / 1024:.2f} GB"
-                            used_str = f"{user_egress_mb:.2f} MB"
-                            if user_egress_mb >= 1024:
-                                used_str = f"{user_egress_mb / 1024:.2f} GB"
-                            usage_text = f"Today: {user_files} files · {used_str} used of {limit_str} (Global Limit)"
-                        else:
-                            usage_text = f"Today: {user_files} files · {user_egress_mb:.2f} MB used (Unlimited)"
-                    else:
-                        if daily_egress_mb_limit <= 0 and daily_file_count_limit <= 0 and global_limit_mb <= 0:
-                            usage_text = f"Today: {user_files} files · {user_egress_mb:.2f} MB used (No limits set)"
-                        else:
-                            limit_to_show = daily_egress_mb_limit
-                            if global_limit_mb > 0 and (daily_egress_mb_limit <= 0 or global_limit_mb < daily_egress_mb_limit):
-                                limit_to_show = global_limit_mb
-                            if limit_to_show > 0:
-                                limit_str = f"{limit_to_show} MB"
-                                if limit_to_show >= 1024:
-                                    limit_str = f"{limit_to_show / 1024:.2f} GB"
+                        if self.user_id == Config.CEO_ID or self.user_id in Config.ADMIN_IDS:
+                            if global_limit_mb > 0:
+                                limit_str = f"{global_limit_mb} MB"
+                                if global_limit_mb >= 1024:
+                                    limit_str = f"{global_limit_mb / 1024:.2f} GB"
+                                used_str = f"{user_egress_mb:.2f} MB"
+                                if user_egress_mb >= 1024:
+                                    used_str = f"{user_egress_mb / 1024:.2f} GB"
+                                usage_text = f"Today: {user_files} files · {used_str} used of {limit_str} (Global Limit)"
                             else:
-                                limit_str = "Unlimited"
-                            used_str = f"{user_egress_mb:.2f} MB"
-                            if user_egress_mb >= 1024:
-                                used_str = f"{user_egress_mb / 1024:.2f} GB"
-                            usage_text = f"Today: {user_files} files · {used_str} used of {limit_str}"
+                                usage_text = f"Today: {user_files} files · {user_egress_mb:.2f} MB used (Unlimited)"
+                        else:
+                            if daily_egress_mb_limit <= 0 and daily_file_count_limit <= 0 and global_limit_mb <= 0:
+                                usage_text = f"Today: {user_files} files · {user_egress_mb:.2f} MB used (No limits set)"
+                            else:
+                                limit_to_show = daily_egress_mb_limit
+                                if global_limit_mb > 0 and (daily_egress_mb_limit <= 0 or global_limit_mb < daily_egress_mb_limit):
+                                    limit_to_show = global_limit_mb
+                                if limit_to_show > 0:
+                                    limit_str = f"{limit_to_show} MB"
+                                    if limit_to_show >= 1024:
+                                        limit_str = f"{limit_to_show / 1024:.2f} GB"
+                                else:
+                                    limit_str = "Unlimited"
+                                used_str = f"{user_egress_mb:.2f} MB"
+                                if user_egress_mb >= 1024:
+                                    used_str = f"{user_egress_mb / 1024:.2f} GB"
+                                usage_text = f"Today: {user_files} files · {used_str} used of {limit_str}"
 
-                    summary_msg = queue_manager.get_batch_summary(batch_id, usage_text)
-                    await self.client.send_message(self.user_id, summary_msg)
-                except Exception as e:
-                    logger.warning(f"Failed to send early batch completion msg: {e}")
+                        summary_msg = queue_manager.get_batch_summary(batch_id, usage_text)
+                        await self.client.send_message(self.user_id, summary_msg)
+                        if queue_manager.batches.get(batch_id):
+                            setattr(queue_manager.batches.get(batch_id), "summary_sent", True)
+                    except Exception as e:
+                        logger.warning(f"Failed to send early batch completion msg: {e}")
 
     async def _initialize(self) -> bool:
+        from pyrogram.errors import FloodWait
         if not shutil.which("ffmpeg"):
             try:
                 await self.message.edit_text(
                     "❌ **System Error**\n\n`ffmpeg` binary not found. Contact administrator."
                 )
             except MessageNotModified:
+                pass
+            except FloodWait as e:
+                logger.warning(f"FloodWait in _initialize: sleeping for {e.value}s")
+                await asyncio.sleep(e.value + 1)
+                try:
+                    await self.message.edit_text(
+                        "❌ **System Error**\n\n`ffmpeg` binary not found. Contact administrator."
+                    )
+                except Exception:
+                    pass
+            except Exception:
                 pass
             return False
 
@@ -191,6 +206,19 @@ class TaskProcessor:
                 f"{XTVEngine.get_signature(mode=self.mode)}"
             )
         except MessageNotModified:
+            pass
+        except FloodWait as e:
+            logger.warning(f"FloodWait in _initialize: sleeping for {e.value}s")
+            await asyncio.sleep(e.value + 1)
+            try:
+                self.status_msg = await self.message.edit_text(
+                    "⏳ **Initializing Task...**\n"
+                    "Allocating resources and preparing environment.\n\n"
+                    f"{XTVEngine.get_signature(mode=self.mode)}"
+                )
+            except Exception:
+                pass
+        except Exception:
             pass
 
         self.settings = await db.get_settings(self.user_id)
@@ -766,51 +794,39 @@ class TaskProcessor:
                 )
                 return
 
-        try:
-            if is_tunneling:
-                try:
-                    pass
-                except Exception:
-                    pass
+        from pyrogram.errors import FloodWait
 
-            thumb = (
-                self.thumb_path
-                if (
+        max_upload_retries = 3
+        media_msg = None
+
+        for upload_attempt in range(max_upload_retries):
+            try:
+                if is_tunneling:
+                    try:
+                        pass
+                    except Exception:
+                        pass
+
+                thumb = (
                     self.thumb_path
-                    and os.path.exists(self.thumb_path)
-                    and not self.is_subtitle
+                    if (
+                        self.thumb_path
+                        and os.path.exists(self.thumb_path)
+                        and not self.is_subtitle
+                    )
+                    else None
                 )
-                else None
-            )
 
-            send_as = self.data.get("send_as")
+                send_as = self.data.get("send_as")
 
-            file_ext = os.path.splitext(self.output_path)[1].lower()
-            is_vid_ext = file_ext in [".mp4", ".mkv", ".webm", ".avi", ".mov"]
-            is_aud_ext = file_ext in [".mp3", ".flac", ".m4a", ".wav", ".ogg"]
-            is_img_ext = file_ext in [".jpg", ".jpeg", ".png", ".webp"]
+                file_ext = os.path.splitext(self.output_path)[1].lower()
+                is_vid_ext = file_ext in [".mp4", ".mkv", ".webm", ".avi", ".mov"]
+                is_aud_ext = file_ext in [".mp3", ".flac", ".m4a", ".wav", ".ogg"]
+                is_img_ext = file_ext in [".jpg", ".jpeg", ".png", ".webp"]
 
-            if send_as == "photo" or (
-                self.message.photo and not send_as and not is_vid_ext and not is_aud_ext
-            ):
-                media_msg = await self.active_client.send_photo(
-                    chat_id=target_chat_id,
-                    photo=self.output_path,
-                    caption=caption,
-                    progress=progress_for_pyrogram,
-                    progress_args=(
-                        (
-                            "📤 **Uploading Photo (Tunneling)...**"
-                            if is_tunneling
-                            else "📤 **Uploading Photo...**"
-                        ),
-                        self.status_msg,
-                        upload_start,
-                        self.mode,
-                    ),
-                )
-            elif send_as == "media":
-                if is_img_ext:
+                if send_as == "photo" or (
+                    self.message.photo and not send_as and not is_vid_ext and not is_aud_ext
+                ):
                     media_msg = await self.active_client.send_photo(
                         chat_id=target_chat_id,
                         photo=self.output_path,
@@ -827,44 +843,80 @@ class TaskProcessor:
                             self.mode,
                         ),
                     )
-                elif is_vid_ext:
-                    media_msg = await self.active_client.send_video(
-                        chat_id=target_chat_id,
-                        video=self.output_path,
-                        thumb=thumb,
-                        caption=caption,
-                        progress=progress_for_pyrogram,
-                        progress_args=(
-                            (
-                                "📤 **Uploading Video (Tunneling)...**"
-                                if is_tunneling
-                                else "📤 **Uploading Video...**"
+                elif send_as == "media":
+                    if is_img_ext:
+                        media_msg = await self.active_client.send_photo(
+                            chat_id=target_chat_id,
+                            photo=self.output_path,
+                            caption=caption,
+                            progress=progress_for_pyrogram,
+                            progress_args=(
+                                (
+                                    "📤 **Uploading Photo (Tunneling)...**"
+                                    if is_tunneling
+                                    else "📤 **Uploading Photo...**"
+                                ),
+                                self.status_msg,
+                                upload_start,
+                                self.mode,
                             ),
-                            self.status_msg,
-                            upload_start,
-                            self.mode,
-                        ),
-                    )
-                elif is_aud_ext:
-                    media_msg = await self.active_client.send_audio(
-                        chat_id=target_chat_id,
-                        audio=self.output_path,
-                        thumb=thumb,
-                        caption=caption,
-                        title=self.metadata.get("title"),
-                        performer=self.metadata.get("artist"),
-                        progress=progress_for_pyrogram,
-                        progress_args=(
-                            (
-                                "📤 **Uploading Audio (Tunneling)...**"
-                                if is_tunneling
-                                else "📤 **Uploading Audio...**"
+                        )
+                    elif is_vid_ext:
+                        media_msg = await self.active_client.send_video(
+                            chat_id=target_chat_id,
+                            video=self.output_path,
+                            thumb=thumb,
+                            caption=caption,
+                            progress=progress_for_pyrogram,
+                            progress_args=(
+                                (
+                                    "📤 **Uploading Video (Tunneling)...**"
+                                    if is_tunneling
+                                    else "📤 **Uploading Video...**"
+                                ),
+                                self.status_msg,
+                                upload_start,
+                                self.mode,
                             ),
-                            self.status_msg,
-                            upload_start,
-                            self.mode,
-                        ),
-                    )
+                        )
+                    elif is_aud_ext:
+                        media_msg = await self.active_client.send_audio(
+                            chat_id=target_chat_id,
+                            audio=self.output_path,
+                            thumb=thumb,
+                            caption=caption,
+                            title=self.metadata.get("title"),
+                            performer=self.metadata.get("artist"),
+                            progress=progress_for_pyrogram,
+                            progress_args=(
+                                (
+                                    "📤 **Uploading Audio (Tunneling)...**"
+                                    if is_tunneling
+                                    else "📤 **Uploading Audio...**"
+                                ),
+                                self.status_msg,
+                                upload_start,
+                                self.mode,
+                            ),
+                        )
+                    else:
+                        media_msg = await self.active_client.send_document(
+                            chat_id=target_chat_id,
+                            document=self.output_path,
+                            thumb=thumb,
+                            caption=caption,
+                            progress=progress_for_pyrogram,
+                            progress_args=(
+                                (
+                                    "📤 **Uploading Media (Tunneling)...**"
+                                    if is_tunneling
+                                    else "📤 **Uploading Media...**"
+                                ),
+                                self.status_msg,
+                                upload_start,
+                                self.mode,
+                            ),
+                        )
                 else:
                     media_msg = await self.active_client.send_document(
                         chat_id=target_chat_id,
@@ -874,49 +926,48 @@ class TaskProcessor:
                         progress=progress_for_pyrogram,
                         progress_args=(
                             (
-                                "📤 **Uploading Media (Tunneling)...**"
+                                "📤 **Uploading Final File (Tunneling)...**"
                                 if is_tunneling
-                                else "📤 **Uploading Media...**"
+                                else "📤 **Uploading Final File...**"
                             ),
                             self.status_msg,
                             upload_start,
                             self.mode,
                         ),
                     )
-            else:
-                media_msg = await self.active_client.send_document(
-                    chat_id=target_chat_id,
-                    document=self.output_path,
-                    thumb=thumb,
-                    caption=caption,
-                    progress=progress_for_pyrogram,
-                    progress_args=(
-                        (
-                            "📤 **Uploading Final File (Tunneling)...**"
-                            if is_tunneling
-                            else "📤 **Uploading Final File...**"
-                        ),
-                        self.status_msg,
-                        upload_start,
-                        self.mode,
-                    ),
-                )
 
-            if is_tunneling:
-                try:
-                    await self.client.copy_message(
-                        chat_id=self.user_id,
-                        from_chat_id=self.tunnel_id,
-                        message_id=media_msg.id,
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"Failed to copy tunneled file to user {self.user_id}: {e}"
-                    )
-                    await self.client.send_message(
-                        self.user_id,
-                        f"❌ **Delivery Error**\n\nThe file was processed successfully but the bot failed to deliver it to you from the tunnel. Error: `{e}`",
-                    )
+                if is_tunneling:
+                    for tunnel_copy_attempt in range(3):
+                        try:
+                            await self.client.copy_message(
+                                chat_id=self.user_id,
+                                from_chat_id=self.tunnel_id,
+                                message_id=media_msg.id,
+                            )
+                            break
+                        except FloodWait as e:
+                            logger.warning(f"FloodWait during tunnel copy: sleeping {e.value}s")
+                            await asyncio.sleep(e.value + 1)
+                        except Exception as e:
+                            logger.error(
+                                f"Failed to copy tunneled file to user {self.user_id}: {e}"
+                            )
+                            if tunnel_copy_attempt == 2:
+                                await self.client.send_message(
+                                    self.user_id,
+                                    f"❌ **Delivery Error**\n\nThe file was processed successfully but the bot failed to deliver it to you from the tunnel. Error: `{e}`",
+                                )
+                break # Break out of the upload_attempt loop if successful
+            except FloodWait as e:
+                logger.warning(f"FloodWait during upload: sleeping {e.value}s before retrying")
+                await asyncio.sleep(e.value + 1)
+            except Exception as e:
+                if upload_attempt == max_upload_retries - 1:
+                    raise e # Re-raise if we're out of retries
+                logger.warning(f"Upload attempt {upload_attempt + 1} failed: {e}. Retrying...")
+                await asyncio.sleep(5)
+
+        try:
 
             # --- USAGE TRACKING INJECTION ---
             usage_text = ""
@@ -998,13 +1049,16 @@ class TaskProcessor:
                     queue_manager.update_status(batch_id, item_id, "done_user")
 
                 if queue_manager.is_batch_complete(batch_id):
-                    try:
-                        summary_msg = queue_manager.get_batch_summary(batch_id, usage_text)
-                        await self.client.send_message(
-                            self.user_id, summary_msg
-                        )
-                    except Exception as e:
-                        logger.warning(f"Failed to send batch completion msg: {e}")
+                    if not getattr(queue_manager.batches.get(batch_id), "summary_sent", False):
+                        try:
+                            summary_msg = queue_manager.get_batch_summary(batch_id, usage_text)
+                            await self.client.send_message(
+                                self.user_id, summary_msg
+                            )
+                            if queue_manager.batches.get(batch_id):
+                                setattr(queue_manager.batches.get(batch_id), "summary_sent", True)
+                        except Exception as e:
+                            logger.warning(f"Failed to send batch completion msg: {e}")
 
                 if dumb_channel:
                     wait_start = time.time()
@@ -1122,10 +1176,18 @@ class TaskProcessor:
         return str(round(size, 2)) + " " + dic_power[n] + "B"
 
     async def _update_status(self, text: str):
-        try:
-            await self.status_msg.edit_text(text)
-        except Exception as e:
-            logger.warning(f"Failed to update status message: {e}")
+        from pyrogram.errors import FloodWait
+        for attempt in range(3):
+            try:
+                if self.status_msg:
+                    await self.status_msg.edit_text(text)
+                return
+            except FloodWait as e:
+                logger.warning(f"FloodWait in _update_status: sleeping for {e.value}s")
+                await asyncio.sleep(e.value + 1)
+            except Exception as e:
+                logger.warning(f"Failed to update status message: {e}")
+                return
 
     async def _cleanup(self):
         for path in [self.input_path, self.output_path, self.thumb_path]:

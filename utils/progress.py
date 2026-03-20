@@ -12,7 +12,7 @@ async def progress_for_pyrogram(
     if current == total:
         pass
     elif hasattr(message, "last_update"):
-        if (now - getattr(message, "last_update")) < 3.0:
+        if (now - getattr(message, "last_update")) < 8.0:
             return
     else:
         setattr(message, "last_update", now)
@@ -51,8 +51,16 @@ async def progress_for_pyrogram(
     text += f"\n━━━━━━━━━━━━━━━━━━━━\n"
     text += f"{XTVEngine.get_signature(mode=mode)}"
 
+    from pyrogram.errors import FloodWait
+    import asyncio
+
     try:
         await message.edit(text=text)
+    except FloodWait as e:
+        # Instead of sleeping and blocking the download/upload process,
+        # we just skip this progress update and artificially advance the last_update
+        # so we don't try to edit again until the flood wait is over.
+        setattr(message, "last_update", now + e.value)
     except Exception as e:
         pass
 
