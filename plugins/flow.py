@@ -1879,6 +1879,7 @@ async def handle_ep_change_prompt(client, callback_query):
     user_id = callback_query.from_user.id
 
     set_state(user_id, f"awaiting_episode_correction_{msg_id}")
+    from pyrogram.errors import FloodWait
     try:
         await callback_query.message.edit_text(
             "**Enter Episode Number:**\n" "Send a number (e.g. 5)",
@@ -1893,6 +1894,26 @@ async def handle_ep_change_prompt(client, callback_query):
             ),
         )
     except MessageNotModified:
+        pass
+    except FloodWait as e:
+        logger.warning(f"FloodWait in handle_ep_change_prompt: sleeping for {e.value}s")
+        await asyncio.sleep(e.value + 1)
+        try:
+            await callback_query.message.edit_text(
+                "**Enter Episode Number:**\n" "Send a number (e.g. 5)",
+                reply_markup=InlineKeyboardMarkup(
+                    [
+                        [
+                            InlineKeyboardButton(
+                                "❌ Cancel", callback_data=f"back_confirm_{msg_id}"
+                            )
+                        ]
+                    ]
+                ),
+            )
+        except Exception:
+            pass
+    except Exception:
         pass
 
 
