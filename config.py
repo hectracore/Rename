@@ -5,7 +5,7 @@ load_dotenv()
 
 
 class Config:
-    VERSION = "v1.3.1"
+    VERSION = "v1.3.1" #Do not change this version; this is the version from the official repository.
     BOT_TOKEN = os.getenv("BOT_TOKEN")
     API_ID = int(os.getenv("API_ID", 0))
     API_HASH = os.getenv("API_HASH")
@@ -24,7 +24,8 @@ class Config:
 
     DOWNLOAD_DIR = "downloads/"
     THUMB_PATH = "downloads/thumb.jpg"
-
+    
+    # Tenplates can be changed, in the Bot directly, or if you want also here.
     DEFAULT_TEMPLATES = {
         "title": "@XTVglobal - {title} {season_episode}",
         "author": "@XTVglobal",
@@ -51,7 +52,7 @@ if not os.path.exists(Config.DOWNLOAD_DIR):
     os.makedirs(Config.DOWNLOAD_DIR)
 
 # --------------------------------------------------------------------------
-# Developed by 𝕏0L0™ (@davdxpx) | © 2026 XTV Network Global
+# Developed by 𝕏0L0™ (@davdxpx) | © 2026 𝕏TV Network Global
 # Don't Remove Credit
 # Telegram Channel @XTVbots
 # Developed for the 𝕏TV Network @XTVglobal
