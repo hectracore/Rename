@@ -27,7 +27,7 @@ def get_user_main_menu():
                     "📺 Dumb Channels", callback_data="dumb_user_menu"
                 ),
                 InlineKeyboardButton(
-                    "⚙️ General Settings", callback_data="user_general_settings"
+                    "⚙️ General Settings", callback_data="user_general_settings_menu"
                 ),
             ],
             [
@@ -781,11 +781,34 @@ async def user_settings_callback(client, callback_query):
             )
         except MessageNotModified:
             pass
-    elif data == "user_general_settings":
-        current_channel = await db.get_channel(user_id)
+    elif data == "user_general_settings_menu":
         try:
             await callback_query.message.edit_text(
                 f"⚙️ **General Settings**\n\n"
+                "Select a setting to configure:",
+                reply_markup=InlineKeyboardMarkup(
+                    [
+                        [
+                            InlineKeyboardButton(
+                                "📢 Channel Username", callback_data="user_general_channel"
+                            )
+                        ],
+                        [
+                            InlineKeyboardButton(
+                                "🌍 Preferred Language", callback_data="user_general_language"
+                            )
+                        ],
+                        [InlineKeyboardButton("← Back", callback_data="user_main")],
+                    ]
+                ),
+            )
+        except MessageNotModified:
+            pass
+    elif data == "user_general_channel":
+        current_channel = await db.get_channel(user_id)
+        try:
+            await callback_query.message.edit_text(
+                f"📢 **Channel Username Settings**\n\n"
                 f"Current Channel Variable: `{current_channel}`\n\n"
                 "Click below to change it.",
                 reply_markup=InlineKeyboardMarkup(
@@ -795,7 +818,7 @@ async def user_settings_callback(client, callback_query):
                                 "✏️ Change", callback_data="prompt_user_channel"
                             )
                         ],
-                        [InlineKeyboardButton("← Back", callback_data="user_main")],
+                        [InlineKeyboardButton("← Back", callback_data="user_general_settings_menu")],
                     ]
                 ),
             )
@@ -812,6 +835,43 @@ async def user_settings_callback(client, callback_query):
             )
         except MessageNotModified:
             pass
+    elif data == "user_general_language":
+        current_language = await db.get_preferred_language(user_id)
+        try:
+            await callback_query.message.edit_text(
+                f"🌍 **Preferred Language Settings**\n\n"
+                f"Current Preferred Language: `{current_language}`\n\n"
+                "This language code is used when fetching data from TMDb (e.g., `en-US`, `de-DE`, `es-ES`).\n\n"
+                "Click below to change it.",
+                reply_markup=InlineKeyboardMarkup(
+                    [
+                        [
+                            InlineKeyboardButton(
+                                "✏️ Change", callback_data="prompt_user_language"
+                            )
+                        ],
+                        [InlineKeyboardButton("← Back", callback_data="user_general_settings_menu")],
+                    ]
+                ),
+            )
+        except MessageNotModified:
+            pass
+    elif data == "prompt_user_language":
+        user_sessions[user_id] = "awaiting_user_language"
+        try:
+            await callback_query.message.edit_text(
+                "🌍 **Send the new Language code to use (e.g., `en-US`, `de-DE`, `es-ES`, etc.):**",
+                reply_markup=InlineKeyboardMarkup(
+                    [[InlineKeyboardButton("❌ Cancel", callback_data="user_cancel_language")]]
+                ),
+            )
+        except MessageNotModified:
+            pass
+    elif data == "user_cancel_language":
+        user_sessions.pop(user_id, None)
+        callback_query.data = "user_general_settings_menu"
+        await user_settings_callback(client, callback_query)
+        return
     elif data == "user_cancel":
         user_sessions.pop(user_id, None)
         await callback_query.message.delete()
@@ -1039,6 +1099,19 @@ async def handle_user_text(client, message):
         )
         await message.reply_text(
             f"✅ Your channel variable updated to:\n`{new_channel}`",
+            reply_markup=reply_markup,
+        )
+        user_sessions.pop(user_id, None)
+
+    elif state == "awaiting_user_language":
+        new_language = message.text
+        await db.update_preferred_language(new_language, user_id)
+
+        reply_markup = InlineKeyboardMarkup(
+            [[InlineKeyboardButton("← Back", callback_data="user_general_settings_menu")]]
+        )
+        await message.reply_text(
+            f"✅ Your preferred language updated to:\n`{new_language}`",
             reply_markup=reply_markup,
         )
         user_sessions.pop(user_id, None)

@@ -65,7 +65,7 @@ def analyze_filename(filename):
         }
 
 
-async def auto_match_tmdb(metadata):
+async def auto_match_tmdb(metadata, language="en-US"):
     title = metadata.get("title")
     year = metadata.get("year")
     media_type = metadata.get("type")
@@ -76,9 +76,9 @@ async def auto_match_tmdb(metadata):
     results = []
     try:
         if media_type == "series":
-            results = await tmdb.search_tv(title)
+            results = await tmdb.search_tv(title, language=language)
         else:
-            results = await tmdb.search_movie(title)
+            results = await tmdb.search_movie(title, language=language)
 
         if not results:
             return None
@@ -86,7 +86,7 @@ async def auto_match_tmdb(metadata):
         best_match = results[0]
         tmdb_id = best_match["id"]
 
-        details = await tmdb.get_details(best_match["type"], tmdb_id)
+        details = await tmdb.get_details(best_match["type"], tmdb_id, language=language)
 
         if not details:
             return None
