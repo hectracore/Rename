@@ -111,6 +111,7 @@ class Database:
                     "templates": Config.DEFAULT_TEMPLATES,
                     "filename_templates": Config.DEFAULT_FILENAME_TEMPLATES,
                     "channel": Config.DEFAULT_CHANNEL,
+                    "preferred_language": "en-US",
                 }
                 await self.settings.insert_one(default_settings)
                 return default_settings
@@ -201,6 +202,23 @@ class Database:
             )
         except Exception as e:
             logger.error(f"Error updating channel for {doc_id}: {e}")
+
+    async def get_preferred_language(self, user_id=None):
+        settings = await self.get_settings(user_id)
+        if settings:
+            return settings.get("preferred_language", "en-US")
+        return "en-US"
+
+    async def update_preferred_language(self, value, user_id=None):
+        if self.settings is None:
+            return
+        doc_id = self._get_doc_id(user_id)
+        try:
+            await self.settings.update_one(
+                {"_id": doc_id}, {"$set": {"preferred_language": value}}, upsert=True
+            )
+        except Exception as e:
+            logger.error(f"Error updating preferred language for {doc_id}: {e}")
 
     async def get_dumb_channels(self, user_id=None):
         settings = await self.get_settings(user_id)

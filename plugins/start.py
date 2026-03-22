@@ -65,17 +65,7 @@ async def handle_start_command_unique(client, message):
                 ],
                 [
                     InlineKeyboardButton(
-                        "🎵 Audio Metadata Editor", callback_data="audio_editor_menu"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        "🔀 File Converter", callback_data="file_converter_menu"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        "© Image Watermarker", callback_data="watermarker_menu"
+                        "✨ Other Features", callback_data="other_features_menu"
                     )
                 ],
                 [InlineKeyboardButton("📖 Help & Guide", callback_data="help_guide")],
@@ -279,6 +269,11 @@ async def handle_end_command_unique(client, message):
                         "🎬 Start Renaming Manually", callback_data="start_renaming"
                     )
                 ],
+                [
+                    InlineKeyboardButton(
+                        "✨ Other Features", callback_data="other_features_menu"
+                    )
+                ],
                 [InlineKeyboardButton("📖 Help & Guide", callback_data="help_guide")],
             ]
         ),
@@ -288,6 +283,43 @@ async def handle_end_command_unique(client, message):
 from utils.logger import debug
 
 debug("✅ Loaded handler: help_callback")
+
+
+@Client.on_callback_query(filters.regex(r"^other_features_menu$"))
+async def handle_other_features_menu(client, callback_query):
+    await callback_query.answer()
+    try:
+        await callback_query.message.edit_text(
+            "**✨ Other Features**\n\n"
+            "Select an additional tool below:",
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton(
+                            "🎵 Audio Metadata Editor", callback_data="audio_editor_menu"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            "🔀 File Converter", callback_data="file_converter_menu"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            "© Image Watermarker", callback_data="watermarker_menu"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            "📝 Subtitle Extractor", callback_data="subtitle_extractor_menu"
+                        )
+                    ],
+                    [InlineKeyboardButton("❌ Close", callback_data="help_close")],
+                ]
+            ),
+        )
+    except MessageNotModified:
+        pass
 
 
 @Client.on_callback_query(filters.regex(r"^help_"))

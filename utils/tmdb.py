@@ -9,13 +9,14 @@ class TMDb:
     def __init__(self):
         self.api_key = Config.TMDB_API_KEY
 
-    async def _request(self, endpoint, params=None):
+    async def _request(self, endpoint, params=None, language="en-US"):
         if params is None:
             params = {}
         else:
             params = params.copy()
 
         params["api_key"] = self.api_key
+        params["language"] = language
 
         async with aiohttp.ClientSession() as session:
             try:
@@ -28,8 +29,8 @@ class TMDb:
             except Exception as e:
                 return None
 
-    async def search_movie(self, query):
-        data = await self._request("/search/movie", {"query": query})
+    async def search_movie(self, query, language="en-US"):
+        data = await self._request("/search/movie", {"query": query}, language)
         if not data or "results" not in data:
             return []
 
@@ -55,8 +56,8 @@ class TMDb:
             )
         return results
 
-    async def search_tv(self, query):
-        data = await self._request("/search/tv", {"query": query})
+    async def search_tv(self, query, language="en-US"):
+        data = await self._request("/search/tv", {"query": query}, language)
         if not data or "results" not in data:
             return []
 
@@ -84,9 +85,9 @@ class TMDb:
             )
         return results
 
-    async def get_details(self, media_type, tmdb_id):
+    async def get_details(self, media_type, tmdb_id, language="en-US"):
         endpoint = f"/movie/{tmdb_id}" if media_type == "movie" else f"/tv/{tmdb_id}"
-        return await self._request(endpoint)
+        return await self._request(endpoint, language=language)
 
 
 tmdb = TMDb()

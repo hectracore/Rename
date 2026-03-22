@@ -251,15 +251,17 @@ async def manual_title_handler(client, message):
 
 
 async def search_handler(client, message, media_type):
+    user_id = message.from_user.id
     query = message.text
     logger.debug(f"Searching {media_type} for: {query}")
     msg = await message.reply_text(f"🔍 Searching for '{query}'...")
 
     try:
+        lang = await db.get_preferred_language(user_id)
         if media_type == "movie":
-            results = await tmdb.search_movie(query)
+            results = await tmdb.search_movie(query, language=lang)
         else:
-            results = await tmdb.search_tv(query)
+            results = await tmdb.search_tv(query, language=lang)
     except Exception as e:
         logger.error(f"TMDb search failed: {e}")
         try:
@@ -488,10 +490,11 @@ async def handle_text_input(client, message):
             msg = await message.reply_text(f"🔍 Searching {mtype} for '{query}'...")
 
             try:
+                lang = await db.get_preferred_language(user_id)
                 if mtype == "series":
-                    results = await tmdb.search_tv(query)
+                    results = await tmdb.search_tv(query, language=lang)
                 else:
-                    results = await tmdb.search_movie(query)
+                    results = await tmdb.search_movie(query, language=lang)
             except Exception as e:
                 await msg.edit_text(f"Error: {e}")
                 return
@@ -579,7 +582,8 @@ async def handle_tmdb_selection(client, callback_query):
     tmdb_id = data[3]
 
     try:
-        details = await tmdb.get_details(media_type, tmdb_id)
+        lang = await db.get_preferred_language(user_id)
+        details = await tmdb.get_details(media_type, tmdb_id, language=lang)
         if not details:
             await callback_query.answer("Error fetching details!", show_alert=True)
             return
@@ -850,6 +854,25 @@ async def handle_gen_prompt_rename(client, callback_query):
         pass
 
 
+@Client.on_callback_query(filters.regex(r"^subtitle_extractor_menu$"))
+async def handle_subtitle_extractor_menu(client, callback_query):
+    await callback_query.answer()
+    user_id = callback_query.from_user.id
+    clear_session(user_id)
+    set_state(user_id, "awaiting_extract_subtitles")
+
+    try:
+        await callback_query.message.edit_text(
+            "📝 **Subtitle Extractor**\n\n"
+            "Please **send me the video file** you want to extract subtitles from.",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("❌ Cancel", callback_data="cancel_rename")]]
+            ),
+        )
+    except MessageNotModified:
+        pass
+
+
 @Client.on_callback_query(filters.regex(r"^cancel_rename$"))
 async def handle_cancel(client, callback_query):
     await callback_query.answer()
@@ -1000,6 +1023,15 @@ async def handle_file_upload(client, message):
             )
             buttons.append(
                 [InlineKeyboardButton("Convert to MP4", callback_data="convert_to_mp4")]
+            )
+            buttons.append(
+                [InlineKeyboardButton("Convert to x264 (H.264)", callback_data="convert_to_x264")]
+            )
+            buttons.append(
+                [InlineKeyboardButton("Convert to x265 (HEVC)", callback_data="convert_to_x265")]
+            )
+            buttons.append(
+                [InlineKeyboardButton("Normalize Audio", callback_data="convert_to_audionorm")]
             )
         elif is_image:
             ext = os.path.splitext(file_name)[1].lower() if file_name else ""
@@ -1326,6 +1358,8 @@ async def handle_file_upload(client, message):
 
     data = {
         "file_message": message,
+        "file_chat_id": message.chat.id,
+        "file_message_id": message.id,
         "quality": quality,
         "episode": episode,
         "season": season,
@@ -1402,6 +1436,42 @@ async def handle_archive_upload(client, message, user_id, file_name, state):
         except:
             pass
 
+@Client.on_message((filters.video | filters.document) & filters.private, group=1)
+async def handle_subtitle_extractor_upload(client, message):
+    user_id = message.from_user.id
+    state = get_state(user_id)
+
+    if state == "awaiting_extract_subtitles":
+        file_name = "video.mkv"
+        if getattr(message, "video", None):
+            file_name = message.video.file_name or "video.mp4"
+        elif getattr(message, "document", None):
+            file_name = message.document.file_name or "file.bin"
+
+        update_data(user_id, "original_name", file_name)
+        update_data(user_id, "file_message_id", message.id)
+        update_data(user_id, "file_chat_id", message.chat.id)
+
+        session_data = get_data(user_id)
+        data = {
+            "type": "extract_subtitles",
+            "original_name": session_data.get("original_name"),
+            "file_message_id": session_data.get("file_message_id"),
+            "file_chat_id": session_data.get("file_chat_id"),
+            "file_message": message,
+            "is_auto": False,
+        }
+
+        reply_msg = await client.send_message(user_id, "Processing subtitle extraction...")
+        from plugins.process import process_file
+
+        # We need to stop propagation so `handle_file_upload` in `group=2` does not process this.
+        from pyrogram.exceptions import StopPropagation
+        import asyncio
+        asyncio.create_task(process_file(client, reply_msg, data))
+        clear_session(user_id)
+        raise StopPropagation
+
 @Client.on_message(filters.text & filters.private & ~filters.regex(r"^/"), group=1)
 async def handle_password_input(client, message):
     user_id = message.from_user.id
@@ -1471,7 +1541,8 @@ async def process_extracted_archive(client, user_id, archive_path, msg, state, p
         file_size = os.path.getsize(file_path)
 
         metadata = analyze_filename(file_name)
-        tmdb_data = await auto_match_tmdb(metadata)
+        lang = await db.get_preferred_language(user_id)
+        tmdb_data = await auto_match_tmdb(metadata, language=lang)
 
         if not tmdb_data:
             await client.send_message(user_id, f"⚠️ **Detection Failed for `{file_name}`**\nSkipping.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Dismiss", callback_data="cancel_rename")]]))
@@ -1528,6 +1599,8 @@ async def process_extracted_archive(client, user_id, archive_path, msg, state, p
 
         data = {
             "file_message": dummy_msg,
+            "file_chat_id": dummy_msg.chat.id,
+            "file_message_id": dummy_msg.id,
             "local_file_path": file_path,
             "original_name": file_name,
             "quality": quality,
@@ -1584,8 +1657,10 @@ async def handle_auto_detection(client, message):
         await handle_archive_upload(client, message, message.from_user.id, file_name, None)
         return
 
+    user_id = message.from_user.id
     metadata = analyze_filename(file_name)
-    tmdb_data = await auto_match_tmdb(metadata)
+    lang = await db.get_preferred_language(user_id)
+    tmdb_data = await auto_match_tmdb(metadata, language=lang)
 
     if not tmdb_data:
         await message.reply_text(
@@ -1602,9 +1677,8 @@ async def handle_auto_detection(client, message):
     quality = metadata["quality"]
     episode = metadata.get("episode", 1) or 1
     season = metadata.get("season", 1) or 1
-    lang = metadata.get("language", "en")
+    media_lang = metadata.get("language", "en")
 
-    user_id = message.from_user.id
 
     default_dumb_channel = await db.get_default_dumb_channel(user_id)
 
@@ -1639,11 +1713,13 @@ async def handle_auto_detection(client, message):
 
     data = {
         "file_message": message,
+        "file_chat_id": message.chat.id,
+        "file_message_id": message.id,
         "original_name": file_name,
         "quality": quality,
         "episode": episode,
         "season": season,
-        "language": lang,
+        "language": media_lang,
         "tmdb_id": tmdb_data["tmdb_id"],
         "title": tmdb_data["title"],
         "year": tmdb_data["year"],
@@ -2360,6 +2436,7 @@ async def handle_change_se_menu(client, callback_query):
 @Client.on_callback_query(filters.regex(r"^correct_tmdb_(\d+)_(\d+)$"))
 async def handle_correct_tmdb_selection(client, callback_query):
     await callback_query.answer()
+    user_id = callback_query.from_user.id
     data = callback_query.data.split("_")
     msg_id = int(data[2])
     tmdb_id = data[3]
@@ -2369,7 +2446,8 @@ async def handle_correct_tmdb_selection(client, callback_query):
     fs = file_sessions[msg_id]
 
     try:
-        details = await tmdb.get_details(fs["type"], tmdb_id)
+        lang = await db.get_preferred_language(user_id)
+        details = await tmdb.get_details(fs["type"], tmdb_id, language=lang)
     except:
         return
 

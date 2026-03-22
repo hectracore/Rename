@@ -574,9 +574,18 @@ class TaskProcessor:
             meta_title = self.metadata.get("title", safe_title)
 
         elif self.media_type == "convert":
-            target_ext = f".{self.data.get('target_format', 'mkv')}"
+            target_format = self.data.get('target_format', 'mkv')
+            # For special conversions, we might keep the original extension or default to .mkv
+            target_ext = f".{target_format}"
+            if target_format in ["x264", "x265", "audionorm"]:
+                target_ext = ".mkv"  # Use .mkv container for these to ensure compatibility
+
             final_filename = f"{safe_title}{target_ext}"
             meta_title = f"{safe_title}"
+
+        elif self.media_type == "extract_subtitles":
+            final_filename = f"{safe_title}_subtitles.srt"
+            meta_title = f"{safe_title} Subtitles"
 
         elif self.media_type == "watermark":
             final_filename = f"{safe_title}_watermarked{ext}"
@@ -795,10 +804,20 @@ class TaskProcessor:
                 cmd.extend(["-vf", "fps=10,scale=320:-1:flags=lanczos", "-c:v", "gif"])
             elif target_format in ["png", "jpg", "jpeg", "webp"]:
                 cmd.extend(["-vframes", "1"])
+            elif target_format == "x264":
+                cmd.extend(["-c:v", "libx264", "-preset", "fast", "-crf", "23", "-c:a", "copy", "-c:s", "copy"])
+            elif target_format == "x265":
+                cmd.extend(["-c:v", "libx265", "-preset", "fast", "-crf", "28", "-c:a", "copy", "-c:s", "copy"])
+            elif target_format == "audionorm":
+                cmd.extend(["-c:v", "copy", "-c:s", "copy", "-af", "loudnorm=I=-16:TP=-1.5:LRA=11", "-c:a", "aac", "-b:a", "192k"])
             else:
                 cmd.extend(["-c", "copy"])
 
             cmd.append(self.output_path)
+            err = None
+        elif self.media_type == "extract_subtitles":
+            # Just extract the first subtitle track to avoid srt format limitations with multiple streams
+            cmd = ["ffmpeg", "-y", "-i", self.input_path, "-map", "0:s:0?", "-c:s", "srt", self.output_path]
             err = None
         else:
             cmd, err = await generate_ffmpeg_command(
@@ -831,6 +850,13 @@ class TaskProcessor:
                 "❌ **Transcoding Failed**\n\nEngine reported an error during processing."
             )
             return False
+
+        if self.media_type == "extract_subtitles":
+            # Check if subtitle was actually extracted
+            if not os.path.exists(self.output_path) or os.path.getsize(self.output_path) == 0:
+                logger.error("Subtitle extraction failed: no subtitles found in stream.")
+                await self._update_status("❌ **Extraction Failed**\n\nNo subtitles were found in this video.")
+                return False
 
         return True
 
@@ -1034,6 +1060,15 @@ class TaskProcessor:
                 await asyncio.sleep(5)
 
         try:
+
+            # Attempt Auto-Delete of original message
+            file_chat_id = self.data.get("file_chat_id")
+            file_message_id = self.data.get("file_message_id")
+            if file_chat_id and file_message_id:
+                try:
+                    await self.client.delete_messages(chat_id=file_chat_id, message_ids=file_message_id)
+                except Exception as del_err:
+                    logger.warning(f"Failed to auto-delete original message: {del_err}")
 
             # --- USAGE TRACKING INJECTION ---
             usage_text = ""
