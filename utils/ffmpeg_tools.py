@@ -153,13 +153,37 @@ async def generate_ffmpeg_command(
     return cmd, None
 
 
-async def execute_ffmpeg(cmd):
+import re
+
+async def execute_ffmpeg(cmd, progress_callback=None):
     process = await asyncio.create_subprocess_exec(
         *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
     )
+
+    stderr_lines = []
+
+    async def read_stderr():
+        # FFmpeg reports progress on stderr
+        while True:
+            line = await process.stderr.readline()
+            if not line:
+                break
+            line_str = line.decode('utf-8', errors='replace')
+            stderr_lines.append(line_str)
+
+            if progress_callback:
+                # Extract time from string like: frame=  116 fps= 30 q=29.0 size=     256kB time=00:00:04.60 bitrate= 454.4kbits/s speed=1.18x
+                time_match = re.search(r"time=(\d{2}:\d{2}:\d{2}\.\d{2})", line_str)
+                if time_match:
+                    await progress_callback(time_match.group(1))
+
     try:
-        stdout, stderr = await process.communicate()
-        return process.returncode == 0, stderr
+        await asyncio.gather(
+            process.wait(),
+            read_stderr()
+        )
+        stderr_str = "".join(stderr_lines).encode()
+        return process.returncode == 0, stderr_str
     except asyncio.CancelledError:
         logging.getLogger("ffmpeg_tools").warning("FFmpeg process cancelled, terminating...")
         if process.returncode is None:

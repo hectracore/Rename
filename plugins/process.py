@@ -15,8 +15,9 @@ from pyrogram.enums import ChatType
 from pyrogram.types import Message
 from config import Config
 from database import db
-from utils.ffmpeg_tools import generate_ffmpeg_command, execute_ffmpeg
+from utils.ffmpeg_tools import generate_ffmpeg_command, execute_ffmpeg, probe_file
 from utils.progress import progress_for_pyrogram
+import math
 from utils.XTVcore import XTVEngine
 from utils.queue_manager import queue_manager
 
@@ -841,7 +842,59 @@ class TaskProcessor:
             )
             return False
 
-        success, stderr = await execute_ffmpeg(cmd)
+        total_duration = 0
+        if self.media_type == "convert" or self.media_type == "extract_subtitles":
+            try:
+                probe, _ = await probe_file(self.input_path)
+                if probe and "format" in probe and "duration" in probe["format"]:
+                    total_duration = float(probe["format"]["duration"])
+            except Exception as e:
+                logger.warning(f"Could not get duration for progress: {e}")
+
+        last_update_time = time.time()
+
+        async def ffmpeg_progress(time_str):
+            nonlocal last_update_time, total_duration
+
+            if total_duration > 0 and (time.time() - last_update_time) > 5:
+                try:
+                    # time_str is like 00:01:23.45
+                    h, m, s = time_str.split(':')
+                    current_time = int(h) * 3600 + int(m) * 60 + float(s)
+
+                    percentage = (current_time / total_duration) * 100
+                    if percentage > 100: percentage = 100
+                    if percentage < 0: percentage = 0
+
+                    filled_blocks = int(percentage / 10)
+                    empty_blocks = 10 - filled_blocks
+                    bar = "█" * filled_blocks + "·" * empty_blocks
+
+                    def format_time(seconds):
+                        hours = int(seconds // 3600)
+                        minutes = int((seconds % 3600) // 60)
+                        secs = int(seconds % 60)
+                        return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
+                    msg = (
+                        "🔀 **Converting Media Format**\n\n"
+                        "Processing video stream...\n"
+                        f"Progress: [{bar}] {percentage:.1f}%\n"
+                        f"Time: {format_time(current_time)} / {format_time(total_duration)}\n"
+                        f"━━━━━━━━━━━━━━━━━━━━\n"
+                        f"{XTVEngine.get_signature(mode=self.mode)}"
+                    )
+
+                    await self._update_status(msg)
+                    last_update_time = time.time()
+                except Exception as e:
+                    logger.debug(f"Failed to update ffmpeg progress: {e}")
+
+        if self.media_type == "convert":
+            success, stderr = await execute_ffmpeg(cmd, progress_callback=ffmpeg_progress)
+        else:
+            success, stderr = await execute_ffmpeg(cmd)
+
         if not success:
             err_msg = stderr.decode() if stderr else "Unknown Error"
             logger.error(f"FFmpeg execution failed: {err_msg}")
@@ -1080,6 +1133,8 @@ class TaskProcessor:
 
                 # Update usage stats using the actual output size, and release the original reservation
                 processed_size = os.path.getsize(self.output_path)
+
+                # Fetch old usage to calculate the diff properly if needed, though db.update_usage handles it.
                 await db.update_usage(self.user_id, processed_size, reserved_file_size_bytes=original_size)
 
                 # Set success flag so cleanup doesn't release quota again
