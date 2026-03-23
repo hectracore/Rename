@@ -217,13 +217,10 @@ async def manual_title_handler(client, message):
     media_type = data.get("type")
 
     if media_type == "series":
-        set_state(user_id, "awaiting_season")
-        await message.reply_text(
-            "📺 **Series:** What Season is this? (e.g., `1` or `01`)",
-            reply_markup=InlineKeyboardMarkup(
-                [[InlineKeyboardButton("❌ Cancel", callback_data="cancel_rename")]]
-            ),
-        )
+        if data.get("is_subtitle"):
+            await initiate_language_selection(client, user_id, message)
+        else:
+            await prompt_dumb_channel(client, user_id, message, is_edit=False)
     elif data.get("personal_type") == "photo":
         set_state(user_id, "awaiting_send_as")
         await message.reply_text(
@@ -318,48 +315,6 @@ async def search_handler(client, message, media_type):
         pass
 
 
-async def season_handler(client, message):
-    user_id = message.from_user.id
-    text = message.text
-
-    if not text.isdigit():
-        await message.reply_text("Please enter a valid number for the season.")
-        return
-
-    season = int(text)
-    update_data(user_id, "season", season)
-
-    data = get_data(user_id)
-    title = data.get("title")
-
-    if data.get("is_subtitle"):
-        set_state(user_id, "awaiting_episode")
-        await message.reply_text(
-            f"**Season {season} Confirmed** for {title}.\n\n"
-            "Please enter the **Episode Number** (e.g. 1, 2, ...):",
-            reply_markup=InlineKeyboardMarkup(
-                [[InlineKeyboardButton("❌ Cancel", callback_data="cancel_rename")]]
-            ),
-        )
-        return
-
-    await prompt_dumb_channel(client, user_id, message)
-
-
-async def episode_handler(client, message):
-    user_id = message.from_user.id
-    text = message.text
-
-    if not text.isdigit():
-        await message.reply_text("Please enter a valid number for the episode.")
-        return
-
-    episode = int(text)
-    update_data(user_id, "episode", episode)
-
-    await initiate_language_selection(client, user_id, message)
-
-
 @Client.on_message(filters.text & filters.private & ~filters.regex(r"^/"), group=2)
 async def handle_text_input(client, message):
     user_id = message.from_user.id
@@ -380,12 +335,6 @@ async def handle_text_input(client, message):
         await search_handler(client, message, "series")
     elif state == "awaiting_manual_title":
         await manual_title_handler(client, message)
-    elif state == "awaiting_season":
-        await season_handler(client, message)
-
-    elif state == "awaiting_episode":
-        await episode_handler(client, message)
-
     elif state == "awaiting_general_name":
         user_id = message.from_user.id
         new_name = message.text.strip()
@@ -609,26 +558,13 @@ async def handle_tmdb_selection(client, callback_query):
     update_data(user_id, "year", year)
     update_data(user_id, "poster", poster)
 
-    if media_type == "series":
-        set_state(user_id, "awaiting_season")
-        try:
-            await callback_query.message.edit_text(
-                f"**Selected Series:** {title} ({year})\n\n"
-                "Please enter the **Season Number** (e.g. 1, 2, ...):",
-                reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton("❌ Cancel", callback_data="cancel_rename")]]
-                ),
-            )
-        except MessageNotModified:
-            pass
+    data = get_data(user_id)
+    if data.get("is_subtitle"):
+        await initiate_language_selection(client, user_id, callback_query.message)
     else:
-        data = get_data(user_id)
-        if data.get("is_subtitle"):
-            await initiate_language_selection(client, user_id, callback_query.message)
-        else:
-            await prompt_dumb_channel(
-                client, user_id, callback_query.message, is_edit=True
-            )
+        await prompt_dumb_channel(
+            client, user_id, callback_query.message, is_edit=True
+        )
 
 
 async def prompt_dumb_channel(client, user_id, message_obj, is_edit=False):
@@ -1309,17 +1245,24 @@ async def handle_file_upload(client, message):
     season = 1
     session_data = get_data(user_id)
     if session_data.get("type") == "series":
-        season = session_data.get("season", 1)
-        if session_data.get("is_subtitle"):
-            episode = session_data.get("episode", 1)
+        match = re.search(r"[sS](\d{1,2})[eE](\d{1,2})", file_name)
+        if match:
+            season = int(match.group(1))
+            episode = int(match.group(2))
         else:
-            match = re.search(r"[sS]?\d{1,2}[eE](\d{1,2})", file_name)
+            match = re.search(r"[eE](\d{1,2})", file_name)
             if match:
                 episode = int(match.group(1))
             else:
-                match = re.search(r"[eE](\d{1,2})", file_name)
+                match = re.search(r"(?:\s|\.|-|^)(\d{1,2})x(\d{1,2})(?:\s|\.|-|$)", file_name, re.IGNORECASE)
                 if match:
-                    episode = int(match.group(1))
+                    season = int(match.group(1))
+                    episode = int(match.group(2))
+                else:
+                    match = re.search(r"season\s*(\d+).*?episode\s*(\d+)", file_name, re.IGNORECASE)
+                    if match:
+                        season = int(match.group(1))
+                        episode = int(match.group(2))
 
     lang = (
         session_data.get("language", "en") if session_data.get("is_subtitle") else None
