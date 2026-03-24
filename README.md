@@ -154,7 +154,7 @@ The XTV Rename Bot can operate in two distinct modes via the `PUBLIC_MODE` envir
 
 **Workflow:**
 1.  **Forward a File**: The bot will Auto-Detect the content.
-2.  **Confirm/Edit**: Use the inline menu to correct the Title, Season, Episode, or Quality.
+2.  **Confirm/Edit**: Use the inline menu to correct the Title, Season, Episode, or Quality. The bot now natively auto-detects Season and Episode numbers from filenames even during manual renaming!
 3.  **Process**: The bot downloads, injects metadata, renames, and re-uploads the file.
 
 ## 🧩 Credits & License
