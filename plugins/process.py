@@ -631,8 +631,14 @@ class TaskProcessor:
             # If the user specifically excluded spaces in the template but used dots/underscores,
             # we should replace any single spaces (e.g. from Title) with the preferred separator.
             if orig_template and " " not in orig_template:
-                if "." in orig_template or "_" in orig_template:
-                    name = name.replace(" ", pref_sep)
+                if "." in orig_template:
+                    name = name.replace(" ", ".")
+                    if "_" not in orig_template:
+                        name = name.replace("_", ".")
+                elif "_" in orig_template:
+                    name = name.replace(" ", "_")
+                    if "." not in orig_template:
+                        name = name.replace(".", "_")
 
             # Final trim
             name = name.strip('._ ')
