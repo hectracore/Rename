@@ -1,6 +1,5 @@
 from pyrogram.errors import MessageNotModified
-from pyrogram import Client, filters
-from pyrogram.exceptions import StopPropagation, ContinuePropagation
+from pyrogram import Client, filters, StopPropagation, ContinuePropagation
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from utils.tmdb import tmdb
 from utils.auth import auth_filter
