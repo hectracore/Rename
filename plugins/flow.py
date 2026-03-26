@@ -2453,16 +2453,6 @@ async def handle_correct_tmdb_selection(client, callback_query):
     await callback_query.message.delete()
     await update_auto_detected_message(client, msg_id, callback_query.from_user.id)
 
-
-# --------------------------------------------------------------------------
-# Developed by 𝕏0L0™ (@davdxpx) | © 2026 XTV Network Global
-# Don't Remove Credit
-# Telegram Channel @XTVbots
-# Developed for the 𝕏TV Network @XTVglobal
-# Backup Channel @XTVhome
-# Contact on Telegram @davdxpx
-# --------------------------------------------------------------------------
-
 @Client.on_callback_query(filters.regex(r"^ch_codec_") & auth_filter)
 async def handle_change_codec(client, callback_query):
     msg_id = int(callback_query.data.split("_")[2])
@@ -2662,3 +2652,12 @@ async def handle_clear_specials(client, callback_query):
     file_sessions[msg_id]["specials"] = []
 
     await update_confirmation_message(client, msg_id, callback_query.from_user.id)
+
+# --------------------------------------------------------------------------
+# Developed by 𝕏0L0™ (@davdxpx) | © 2026 XTV Network Global
+# Don't Remove Credit
+# Telegram Channel @XTVbots
+# Developed for the 𝕏TV Network @XTVglobal
+# Backup Channel @XTVhome
+# Contact on Telegram @davdxpx
+# --------------------------------------------------------------------------
