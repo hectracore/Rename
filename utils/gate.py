@@ -1,6 +1,7 @@
 import asyncio
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from database import db
+from utils.state import update_data
 
 async def send_force_sub_gate(client, message, config):
     user_id = message.from_user.id
@@ -53,18 +54,22 @@ async def send_force_sub_gate(client, message, config):
             buttons.append([InlineKeyboardButton(final_btn_text, url=ch.get("link"))])
 
     if banner_file_id:
-        await client.send_photo(
+        msg = await client.send_photo(
             chat_id=user_id,
             photo=banner_file_id,
             caption=formatted_text,
             reply_markup=InlineKeyboardMarkup(buttons)
         )
     else:
-        await client.send_message(
+        msg = await client.send_message(
             chat_id=user_id,
             text=formatted_text,
             reply_markup=InlineKeyboardMarkup(buttons)
         )
+
+    # Store the force sub message ID so we can delete it later when they join
+    if msg:
+        update_data(user_id, "force_sub_msg_id", msg.id)
 
 welcomed_users = set()
 

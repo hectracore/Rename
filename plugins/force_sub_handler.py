@@ -5,6 +5,7 @@ from plugins.admin import admin_sessions, is_admin
 from config import Config
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from utils.log import get_logger
+from utils.state import get_data, update_data
 
 logger = get_logger("plugins.force_sub_handler")
 
@@ -172,6 +173,17 @@ async def on_user_join_channel(client, update):
     if has_setup:
         return
 
+    # If there is a Force-Sub gate message, delete it
+    session_data = get_data(user.id)
+    if session_data:
+        fs_msg_id = session_data.get("force_sub_msg_id")
+        if fs_msg_id:
+            try:
+                await client.delete_messages(chat_id=user.id, message_ids=fs_msg_id)
+                update_data(user.id, "force_sub_msg_id", None)
+            except Exception as e:
+                logger.debug(f"Could not delete force sub msg {fs_msg_id} for {user.id}: {e}")
+
     # Send the starter setup message
     await send_starter_setup_message(client, user.id, user.first_name)
 
@@ -183,11 +195,18 @@ async def send_starter_setup_message(client, user_id, first_name=""):
         bot_name = f"**{config.get('bot_name', 'XTV Rename Bot')}**"
 
     text = (
-        f"👋 **Welcome to {bot_name}, {first_name}!**\\n\\n"
-        "You are now ready to use the bot. To give you the best experience, "
-        "please select what you primarily want to use this bot for:\\n\\n"
-        "**🧠 Smart Media Mode:** Best for TV Shows and Movies. I will automatically detect seasons, episodes, and download TMDb posters/metadata!\\n\\n"
-        "**⚡ Quick Rename Mode:** Best for Personal Videos, Anime, or general files. I will skip auto-detection and just let you rename the file immediately."
+        f"👋 **Welcome to {bot_name}, {first_name}!**\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        "**Awesome! You're now ready to use the bot.**\n"
+        "To give you the best personalized experience, please choose how you plan to primarily use my features:\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "**🧠 Smart Media Mode**\n"
+        "├ **Best for:** `TV Shows & Movies`\n"
+        "└ **Action:** `Auto-detects metadata and pulls beautiful TMDb posters automatically.`\n\n"
+        "**⚡ Quick Rename Mode**\n"
+        "├ **Best for:** `Personal Videos, Anime, General Files`\n"
+        "└ **Action:** `Skips auto-detection, bypasses TMDb, and goes straight to renaming.`\n\n"
+        "*(Don't worry, you can always change this later in /settings)*"
     )
 
     markup = InlineKeyboardMarkup(
@@ -219,9 +238,9 @@ async def handle_setup_mode_callback(client, callback_query):
     await db.mark_setup_completed(user_id, True)
 
     text = (
-        f"✅ **Setup Complete!**\\n\\n"
-        f"You have selected **{mode_str}**.\\n"
-        "*(You can change this anytime via /settings)*\\n\\n"
+        f"✅ **Setup Complete!**\n\n"
+        f"You have selected **{mode_str}**.\n"
+        "*(You can change this anytime via /settings)*\n\n"
         "**💡 Tip:** Simply send or forward any file to me right now to begin!"
     )
 
