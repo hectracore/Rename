@@ -337,6 +337,14 @@ async def handle_text_input(client, message):
         await manual_title_handler(client, message)
     elif state == "awaiting_general_name":
         user_id = message.from_user.id
+        session_data = get_data(user_id)
+        file_msg_id = session_data.get("file_message_id")
+
+        # Security check: MUST be a reply to the file message or prompt message
+        if file_msg_id and (not message.reply_to_message or message.reply_to_message.id != file_msg_id):
+            await message.reply_text("⚠️ **Please reply directly to the file message** when sending the new name, so I know which file you are renaming.", quote=True)
+            return
+
         new_name = message.text.strip()
         update_data(user_id, "general_name", new_name)
 
@@ -567,9 +575,56 @@ async def handle_tmdb_selection(client, callback_query):
         )
 
 
+import asyncio
+
+async def process_ready_file(client, user_id, message_obj, session_data):
+    if session_data.get("type") == "general":
+        data = {
+            "type": "general",
+            "original_name": session_data.get("original_name"),
+            "file_message_id": session_data.get("file_message_id"),
+            "file_chat_id": session_data.get("file_chat_id"),
+            "is_auto": False,
+            "dumb_channel": session_data.get("dumb_channel"),
+            "send_as": session_data.get("send_as"),
+            "general_name": session_data.get("general_name"),
+        }
+
+        meta = analyze_filename(session_data.get("original_name"))
+        data.update(meta)
+
+        try:
+            msg = await client.get_messages(
+                session_data.get("file_chat_id"), session_data.get("file_message_id")
+            )
+            data["file_message"] = msg
+            if getattr(message_obj, "delete", None):
+                try:
+                    await message_obj.delete()
+                except Exception:
+                    pass
+            reply_msg = await client.send_message(user_id, "Processing file...")
+            from plugins.process import process_file
+            asyncio.create_task(process_file(client, reply_msg, data))
+        except Exception as e:
+            logger.error(f"Failed to process ready file: {e}")
+            await client.send_message(user_id, f"Error: {e}")
+
+        clear_session(user_id)
+        return
+
 async def prompt_dumb_channel(client, user_id, message_obj, is_edit=False):
     channels = await db.get_dumb_channels(user_id)
+    session_data = get_data(user_id)
+    has_file = session_data and session_data.get("file_message_id")
+
     if not channels:
+        if has_file:
+            # We already have the file. Process immediately.
+            from plugins.flow import process_ready_file
+            await process_ready_file(client, user_id, message_obj, session_data)
+            return
+
         set_state(user_id, "awaiting_file_upload")
         text = "✅ **Ready!**\n\nNow, **send me the file(s)** you want to rename."
         reply_markup = InlineKeyboardMarkup(
@@ -632,36 +687,16 @@ async def handle_dumb_selection(client, callback_query):
 
     session_data = get_data(user_id)
 
+    has_file = session_data and session_data.get("file_message_id")
+
     if session_data.get("type") == "general":
-        data = {
-            "type": "general",
-            "original_name": session_data.get("original_name"),
-            "file_message_id": session_data.get("file_message_id"),
-            "file_chat_id": session_data.get("file_chat_id"),
-            "is_auto": False,
-            "dumb_channel": session_data.get("dumb_channel"),
-            "send_as": session_data.get("send_as"),
-            "general_name": session_data.get("general_name"),
-        }
+        if has_file:
+            await process_ready_file(client, user_id, callback_query.message, session_data)
+            return
+        # If no file yet, just fall through
 
-        meta = analyze_filename(session_data.get("original_name"))
-        data.update(meta)
-
-        try:
-            msg = await client.get_messages(
-                session_data.get("file_chat_id"), session_data.get("file_message_id")
-            )
-            data["file_message"] = msg
-            await callback_query.message.delete()
-            reply_msg = await client.send_message(user_id, "Processing file...")
-            from plugins.process import process_file
-
-            asyncio.create_task(process_file(client, reply_msg, data))
-        except Exception as e:
-            logger.error(f"Failed to get message for general mode: {e}")
-            await client.send_message(user_id, f"Error: {e}")
-
-        clear_session(user_id)
+    if has_file:
+        await process_ready_file(client, user_id, callback_query.message, session_data)
         return
 
     set_state(user_id, "awaiting_file_upload")
@@ -938,6 +973,40 @@ import random
 async def handle_file_upload(client, message):
     user_id = message.from_user.id
     state = get_state(user_id)
+
+    if state is None:
+        user_mode = await db.get_workflow_mode(user_id if Config.PUBLIC_MODE else None)
+        if user_mode == "quick_rename_mode":
+            # Switch to general mode and process the file exactly as if they were in awaiting_general_file
+            state = "awaiting_general_file"
+            set_state(user_id, state)
+            update_data(user_id, "type", "general")
+            # We must jump straight to the awaiting_general_file logic and RETURN so we don't hit auto-detect
+            file_name = "unknown_file.bin"
+            if message.document:
+                file_name = message.document.file_name
+            elif message.video:
+                file_name = message.video.file_name
+            elif message.audio:
+                file_name = message.audio.file_name
+            elif message.photo:
+                file_name = f"image_{message.id}.jpg"
+            if not file_name:
+                file_name = "unknown_file.bin"
+            update_data(user_id, "original_name", file_name)
+            update_data(user_id, "file_message_id", message.id)
+            update_data(user_id, "file_chat_id", message.chat.id)
+            set_state(user_id, "awaiting_general_send_as")
+            await message.reply_text(
+                f"📄 **File Received:** `{file_name}`\n\n"
+                "How would you like to receive the output?",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("📁 Send as Document (File)", callback_data="gen_send_as_document")],
+                    [InlineKeyboardButton("▶️ Send as Media (Video/Photo/Audio)", callback_data="gen_send_as_media")],
+                    [InlineKeyboardButton("❌ Cancel", callback_data="cancel_rename")]
+                ])
+            )
+            return
 
     if state == "awaiting_convert_file":
         if (
@@ -1242,19 +1311,8 @@ async def handle_file_upload(client, message):
 
     if state != "awaiting_file_upload":
         if state is None:
-            user_mode = await db.get_workflow_mode(user_id if Config.PUBLIC_MODE else None)
-            if user_mode == "quick_rename_mode":
-                # Act like they pressed "General" from the start menu
-                # But we already have the file! So we bypass the menu.
-                # Actually, handle_auto_detection does exactly this but with TMDb.
-                # To do Quick Rename (General), we need to set state to general
-                # and pretend we just uploaded a file for general mode.
-                set_state(user_id, "awaiting_file_upload")
-                update_data(user_id, "type", "general")
-                # Now the code below will run normally (as if state was awaiting_file_upload)
-            else:
-                await handle_auto_detection(client, message)
-                return
+            await handle_auto_detection(client, message)
+            return
         elif state == "awaiting_convert_file":
             pass
         else:
