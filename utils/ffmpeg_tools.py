@@ -37,14 +37,29 @@ async def probe_file(filepath):
     process = await asyncio.create_subprocess_exec(
         *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
     )
-    stdout, stderr = await process.communicate()
-    if process.returncode != 0:
-        error_msg = stderr.decode().strip() or "ffprobe process failed"
-        return None, error_msg
     try:
-        return json.loads(stdout), None
-    except json.JSONDecodeError as e:
-        return None, f"JSON Decode Error: {e}"
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30.0)
+        if process.returncode != 0:
+            error_msg = stderr.decode().strip() or "ffprobe process failed"
+            return None, error_msg
+        try:
+            return json.loads(stdout), None
+        except json.JSONDecodeError as e:
+            return None, f"JSON Decode Error: {e}"
+    except asyncio.TimeoutError:
+        logging.getLogger("ffmpeg_tools").warning("ffprobe process timed out, killing...")
+        try:
+            process.kill()
+        except Exception:
+            pass
+        return None, "ffprobe process timed out"
+    except asyncio.CancelledError:
+        logging.getLogger("ffmpeg_tools").warning("ffprobe process cancelled, killing...")
+        try:
+            process.kill()
+        except Exception:
+            pass
+        raise
 
 def get_language_name(code):
     return LANGUAGE_MAP.get(code, code)

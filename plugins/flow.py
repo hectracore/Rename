@@ -1321,6 +1321,20 @@ async def handle_file_upload(client, message):
             await message.reply_text(f"🛑 **Quota Exceeded**\n\n{error_msg}")
             return
 
+        import shutil
+        total, used, free = shutil.disk_usage(Config.DOWNLOAD_DIR)
+        required_space = file_size * 2.5
+        if free < required_space:
+            required_mb = required_space / (1024 * 1024)
+            free_mb = free / (1024 * 1024)
+            await message.reply_text(
+                f"❌ **System Error: Insufficient Disk Space**\n\n"
+                f"The server does not have enough storage space to process this file.\n"
+                f"Required: ~{required_mb:.2f} MB\n"
+                f"Available: {free_mb:.2f} MB"
+            )
+            return
+
         await db.reserve_quota(user_id, file_size)
 
     if state != "awaiting_file_upload":

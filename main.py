@@ -94,6 +94,48 @@ if __name__ == "__main__":
         logger.warning(f"Error during Channel caching: {e}")
 
     try:
+        import os
+        import time
+        from config import Config
+
+        def cleanup_orphaned_files():
+            logger.info("Running automated orphaned file cleanup...")
+            download_dir = Config.DOWNLOAD_DIR
+            if not os.path.exists(download_dir):
+                return
+
+            now = time.time()
+            cutoff = now - (24 * 3600)  # 24 hours
+            cleaned_count = 0
+            freed_space = 0
+
+            for root, _, files in os.walk(download_dir):
+                for f in files:
+                    # Ignore standard static files
+                    if f == "thumb.jpg":
+                        continue
+                    file_path = os.path.join(root, f)
+                    try:
+                        mtime = os.path.getmtime(file_path)
+                        if mtime < cutoff:
+                            size = os.path.getsize(file_path)
+                            os.remove(file_path)
+                            cleaned_count += 1
+                            freed_space += size
+                            logger.debug(f"Cleaned orphaned file: {file_path}")
+                    except Exception as e:
+                        logger.warning(f"Error cleaning file {file_path}: {e}")
+
+            if cleaned_count > 0:
+                logger.info(f"Cleanup complete. Removed {cleaned_count} files, freed {freed_space / (1024*1024):.2f} MB.")
+            else:
+                logger.info("Cleanup complete. No orphaned files found.")
+
+        cleanup_orphaned_files()
+    except Exception as e:
+        logger.warning(f"Error during orphaned file cleanup: {e}")
+
+    try:
         from database import db
 
         async def get_userbot_session():

@@ -22,13 +22,28 @@ async def check_password_protected(archive_path: str) -> bool:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
-        stdout, stderr = await process.communicate()
-        output = (stdout.decode() + stderr.decode()).lower()
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60.0)
+            output = (stdout.decode() + stderr.decode()).lower()
 
-        if "wrong password" in output or "cannot open encrypted archive" in output or "data error in encrypted file" in output or "enter password" in output:
-            return True
+            if "wrong password" in output or "cannot open encrypted archive" in output or "data error in encrypted file" in output or "enter password" in output:
+                return True
 
-        return False
+            return False
+        except asyncio.TimeoutError:
+            logger.warning("7z password check timed out, killing...")
+            try:
+                process.kill()
+            except Exception:
+                pass
+            return False
+        except asyncio.CancelledError:
+            logger.warning("7z password check cancelled, killing...")
+            try:
+                process.kill()
+            except Exception:
+                pass
+            raise
     except Exception as e:
         logger.error(f"Error checking archive password status: {e}")
         return False
@@ -47,13 +62,29 @@ async def extract_archive(archive_path: str, dest_dir: str, password: str = None
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
-        stdout, stderr = await process.communicate()
+        try:
+            # Archives can be large, allow 10 minutes timeout
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=600.0)
 
-        if process.returncode == 0:
-            return True
-        else:
-            logger.error(f"Extraction failed: {stderr.decode()}")
+            if process.returncode == 0:
+                return True
+            else:
+                logger.error(f"Extraction failed: {stderr.decode()}")
+                return False
+        except asyncio.TimeoutError:
+            logger.warning("7z extraction timed out, killing...")
+            try:
+                process.kill()
+            except Exception:
+                pass
             return False
+        except asyncio.CancelledError:
+            logger.warning("7z extraction cancelled, killing...")
+            try:
+                process.kill()
+            except Exception:
+                pass
+            raise
 
     except Exception as e:
         logger.error(f"Error extracting archive: {e}")

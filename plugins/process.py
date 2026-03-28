@@ -990,10 +990,22 @@ class TaskProcessor:
             success, stderr = await execute_ffmpeg(cmd)
 
         if not success:
-            err_msg = stderr.decode() if stderr else "Unknown Error"
+            err_msg = "Unknown Error"
+            if stderr:
+                err_lines = stderr.decode(errors='replace').strip().split('\n')
+                # Grab the last few relevant lines for the user
+                err_msg = "\n".join(err_lines[-5:]).strip()
+                if not err_msg:
+                    err_msg = "Unknown Error"
+
             logger.error(f"FFmpeg execution failed: {err_msg}")
+
+            # Truncate to avoid Telegram message length limits
+            if len(err_msg) > 500:
+                err_msg = err_msg[-500:] + "..."
+
             await self._update_status(
-                "❌ **Transcoding Failed**\n\nEngine reported an error during processing."
+                f"❌ **Transcoding Failed**\n\nThe FFmpeg engine reported an error during processing:\n\n`{err_msg}`"
             )
             return False
 
