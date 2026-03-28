@@ -9,13 +9,14 @@ WORKDIR /app
 # git is often needed for some python packages
 # gcc and python3-dev are required to build TgCrypto on ARM architectures
 # p7zip-full is required for unpacking rar/zip/7z archives
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     git \
     gcc \
     python3-dev \
     p7zip-full \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 # Copy the requirements file into the container at /app
 COPY requirements.txt .
