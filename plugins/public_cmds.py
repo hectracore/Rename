@@ -221,7 +221,19 @@ async def handle_premium_command(client, message):
 
     support_contact = config.get("support_contact", "Not set")
     if support_contact != "Not set":
-        buttons.append([InlineKeyboardButton("💬 Contact Admin to Buy", url=f"https://t.me/{support_contact.replace('@', '')}")])
+        import re
+        sc = support_contact.strip()
+        if sc.startswith("http://") or sc.startswith("https://"):
+            url = sc
+        elif sc.startswith("@"):
+            url = f"https://t.me/{sc[1:]}"
+        elif re.match(r"^[a-zA-Z0-9_]{5,32}$", sc):
+            url = f"https://t.me/{sc}"
+        else:
+            url = None
+
+        if url:
+            buttons.append([InlineKeyboardButton("💬 Contact Admin to Buy", url=url)])
 
     buttons.append([InlineKeyboardButton("❌ Close", callback_data="user_cancel")])
 
