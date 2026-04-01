@@ -27,12 +27,13 @@ logger = logging.getLogger("TaskProcessor")
 _SEMAPHORES: Dict[int, Dict[str, Optional[asyncio.Semaphore]]] = {}
 
 # === Helper Functions ===
-def get_semaphore(user_id: int, phase: str) -> asyncio.Semaphore:
+def get_semaphore(user_id: int, phase: str, is_priority: bool = False) -> asyncio.Semaphore:
     if user_id not in _SEMAPHORES:
         _SEMAPHORES[user_id] = {"download": None, "process": None, "upload": None}
 
     if _SEMAPHORES[user_id][phase] is None:
-        _SEMAPHORES[user_id][phase] = asyncio.Semaphore(3)
+        limit = 10 if is_priority else 3
+        _SEMAPHORES[user_id][phase] = asyncio.Semaphore(limit)
 
     return _SEMAPHORES[user_id][phase]
 
@@ -113,6 +114,16 @@ class TaskProcessor:
         timeout_multiplier = (file_size / (1024 * 1024 * 1024)) * 300 if file_size else 0
         phase_timeout = timeout_base + timeout_multiplier
 
+        is_priority = False
+        if Config.PUBLIC_MODE:
+            user_doc = await db.get_user(self.user_id)
+            if user_doc and user_doc.get("is_premium"):
+                plan_name = user_doc.get("premium_plan", "standard")
+                config = await db.get_public_config()
+                if config.get("premium_system_enabled", False):
+                    plan_settings = config.get(f"premium_{plan_name}", {})
+                    is_priority = plan_settings.get("features", {}).get("priority_queue", False)
+
         try:
             if not await self._initialize():
                 if batch_id and item_id:
@@ -120,7 +131,7 @@ class TaskProcessor:
                 return
 
             try:
-                async with get_semaphore(self.user_id, "download"):
+                async with get_semaphore(self.user_id, "download", is_priority):
                     dl_success = await asyncio.wait_for(self._download_media(), timeout=phase_timeout)
                     if not dl_success:
                         if batch_id and item_id:
@@ -134,7 +145,7 @@ class TaskProcessor:
                 return
 
             try:
-                async with get_semaphore(self.user_id, "process"):
+                async with get_semaphore(self.user_id, "process", is_priority):
                     await asyncio.wait_for(self._prepare_resources(), timeout=1800)
                     proc_success = await asyncio.wait_for(self._process_media(), timeout=phase_timeout)
                     if not proc_success:
@@ -149,7 +160,7 @@ class TaskProcessor:
                 return
 
             try:
-                async with get_semaphore(self.user_id, "upload"):
+                async with get_semaphore(self.user_id, "upload", is_priority):
                     await asyncio.wait_for(self._upload_media(), timeout=phase_timeout)
             except asyncio.TimeoutError:
                 logger.error(f"Upload phase timed out for {self.message_id}")

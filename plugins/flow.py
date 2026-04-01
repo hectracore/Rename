@@ -909,6 +909,17 @@ async def handle_cancel(client, callback_query):
     toggles = await db.get_feature_toggles()
     show_other = toggles.get("audio_editor", True) or toggles.get("file_converter", True) or toggles.get("watermarker", True) or toggles.get("subtitle_extractor", True)
 
+    if Config.PUBLIC_MODE and not show_other:
+        user_doc = await db.get_user(user_id)
+        if user_doc and user_doc.get("is_premium"):
+            plan_name = user_doc.get("premium_plan", "standard")
+            config = await db.get_public_config()
+            if config.get("premium_system_enabled", False):
+                plan_settings = config.get(f"premium_{plan_name}", {})
+                pf = plan_settings.get("features", {})
+                if pf.get("audio_editor", True) or pf.get("file_converter", True) or pf.get("watermarker", True) or pf.get("subtitle_extractor", True):
+                    show_other = True
+
     buttons = [
         [InlineKeyboardButton("🎬 Start Renaming Manually", callback_data="start_renaming")]
     ]
@@ -1409,16 +1420,6 @@ async def handle_file_upload(client, message):
     lang = (
         session_data.get("language", "en") if session_data.get("is_subtitle") else None
     )
-
-    is_priority = False
-    if Config.PUBLIC_MODE:
-        user_doc = await db.get_user(user_id)
-        if user_doc and user_doc.get("is_premium"):
-            plan_name = user_doc.get("premium_plan", "standard")
-            config = await db.get_public_config()
-            if config.get("premium_system_enabled", False):
-                plan_settings = config.get(f"premium_{plan_name}", {})
-                is_priority = plan_settings.get("features", {}).get("priority_queue", False)
 
     is_priority = False
     if Config.PUBLIC_MODE:

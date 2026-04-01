@@ -34,10 +34,6 @@ class BatchQueue:
         if not item:
             return None
 
-        if item.is_priority:
-            # Priority items bypass strict order waits
-            return None
-
         earlier_items = [i for i in self.items.values() if i.sort_key < item.sort_key]
 
         for earlier in sorted(earlier_items, key=lambda x: x.sort_key):

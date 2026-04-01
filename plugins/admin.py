@@ -542,14 +542,22 @@ async def admin_callback(client, callback_query):
             def emoji(state): return "✅" if state else "❌"
 
             pq = features.get("priority_queue", False)
+            fc = features.get("file_converter", True)
+            ae = features.get("audio_editor", True)
+            wm = features.get("watermarker", True)
+            se = features.get("subtitle_extractor", True)
 
-            text = f"⚙️ **{plan_name.capitalize()} Plan Features**\n\nToggle which features users on this plan can access:"
+            text = f"⚙️ **{plan_name.capitalize()} Plan Features**\n\nToggle which features users on this plan can access (overrides global toggles):"
 
             try:
                 await callback_query.message.edit_text(
                     text,
                     reply_markup=InlineKeyboardMarkup([
                         [InlineKeyboardButton(f"{emoji(pq)} Priority Queue", callback_data=f"admin_premium_feat_{plan_name}_priority_queue")],
+                        [InlineKeyboardButton(f"{emoji(fc)} File Converter", callback_data=f"admin_premium_feat_{plan_name}_file_converter")],
+                        [InlineKeyboardButton(f"{emoji(ae)} Audio Editor", callback_data=f"admin_premium_feat_{plan_name}_audio_editor")],
+                        [InlineKeyboardButton(f"{emoji(wm)} Watermarker", callback_data=f"admin_premium_feat_{plan_name}_watermarker")],
+                        [InlineKeyboardButton(f"{emoji(se)} Subtitle Extractor", callback_data=f"admin_premium_feat_{plan_name}_subtitle_extractor")],
                         [InlineKeyboardButton("← Back", callback_data=f"admin_premium_plan_{plan_name}")]
                     ])
                 )
@@ -588,8 +596,23 @@ async def admin_callback(client, callback_query):
                     "egress": "📦 **Send the new daily egress limit in MB (e.g., 2048).**\nSend `0` to disable.",
                     "files": "📄 **Send the new daily file limit.**\nSend `0` to disable.",
                     "price": "💵 **Send the new fiat price (e.g., '9.90 USD' or '100 INR').**",
-                    "stars": "⭐ **Send the new Telegram Stars price (integer).**"
                 }
+
+                if field == "stars":
+                    from utils.currency import convert_to_usd_str
+                    config = await db.get_public_config()
+                    plan_settings = config.get(f"premium_{plan_name}", {})
+                    current_fiat = plan_settings.get("price_string", "0 USD")
+                    usd_str = await convert_to_usd_str(current_fiat)
+
+                    try:
+                        usd_val = float(usd_str.replace("$", ""))
+                        recommended_stars = int(usd_val / 0.015)
+                        star_prompt = f"⭐ **Send the new Telegram Stars price (integer).**\n\nYour fiat price converts to roughly `{usd_str}`.\nWe recommend setting this to `{recommended_stars}` Stars (assuming ~$0.015 per Star)."
+                    except:
+                        star_prompt = "⭐ **Send the new Telegram Stars price (integer).**"
+
+                    prompts["stars"] = star_prompt
 
                 try:
                     await callback_query.message.edit_text(
