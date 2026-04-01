@@ -124,18 +124,23 @@ async def pro_setup_handler(client, message):
     if not state:
         raise ContinuePropagation
 
+    # Crucial Fix: If public mode is enabled, general catch-all handlers might intercept this
+    # We must explicitly raise StopPropagation so it doesn't fall through to other handlers.
+
     text = message.text.strip() if message.text else ""
     if not text:
-        return await message.reply_text(
+        await message.reply_text(
             "Please provide text.",
             reply_markup=InlineKeyboardMarkup(
                 [[InlineKeyboardButton("❌ Cancel", callback_data="pro_setup_menu")]]
             ),
         )
+        from pyrogram import StopPropagation
+        raise StopPropagation
 
     if state == "awaiting_api_id":
         if not text.isdigit():
-            return await message.reply_text(
+            await message.reply_text(
                 "API ID must be numeric. Try again.",
                 reply_markup=InlineKeyboardMarkup(
                     [
@@ -147,6 +152,9 @@ async def pro_setup_handler(client, message):
                     ]
                 ),
             )
+            from pyrogram import StopPropagation
+            raise StopPropagation
+
         data["api_id"] = int(text)
         data["state"] = "awaiting_api_hash"
         await message.reply_text(
@@ -155,6 +163,8 @@ async def pro_setup_handler(client, message):
                 [[InlineKeyboardButton("❌ Cancel", callback_data="pro_setup_menu")]]
             ),
         )
+        from pyrogram import StopPropagation
+        raise StopPropagation
 
     elif state == "awaiting_api_hash":
         data["api_hash"] = text
@@ -166,6 +176,8 @@ async def pro_setup_handler(client, message):
                 [[InlineKeyboardButton("❌ Cancel", callback_data="pro_setup_menu")]]
             ),
         )
+        from pyrogram import StopPropagation
+        raise StopPropagation
 
     elif state == "awaiting_phone":
         data["phone"] = text
@@ -255,6 +267,8 @@ async def pro_setup_handler(client, message):
             except MessageNotModified:
                 pass
             del pro_setup_sessions[user_id]
+        from pyrogram import StopPropagation
+        raise StopPropagation
 
     elif state == "awaiting_code":
         code = text.replace(" ", "")
@@ -312,6 +326,8 @@ async def pro_setup_handler(client, message):
             except MessageNotModified:
                 pass
             del pro_setup_sessions[user_id]
+        from pyrogram import StopPropagation
+        raise StopPropagation
 
     elif state == "awaiting_password":
         msg = await message.reply_text("⏳ Verifying password...")
@@ -349,6 +365,8 @@ async def pro_setup_handler(client, message):
             except MessageNotModified:
                 pass
             del pro_setup_sessions[user_id]
+        from pyrogram import StopPropagation
+        raise StopPropagation
 
 async def finalize_setup(userbot, user_id, msg):
     try:
