@@ -62,6 +62,17 @@ async def handle_start_command_unique(client, message):
     toggles = await db.get_feature_toggles()
     show_other = toggles.get("audio_editor", True) or toggles.get("file_converter", True) or toggles.get("watermarker", True) or toggles.get("subtitle_extractor", True)
 
+    if Config.PUBLIC_MODE and not show_other:
+        user_doc = await db.get_user(user_id)
+        if user_doc and user_doc.get("is_premium"):
+            plan_name = user_doc.get("premium_plan", "standard")
+            config = await db.get_public_config()
+            if config.get("premium_system_enabled", False):
+                plan_settings = config.get(f"premium_{plan_name}", {})
+                pf = plan_settings.get("features", {})
+                if pf.get("audio_editor", True) or pf.get("file_converter", True) or pf.get("watermarker", True) or pf.get("subtitle_extractor", True):
+                    show_other = True
+
     buttons = [
         [InlineKeyboardButton("📁 Rename / Tag Media", callback_data="start_renaming")]
     ]
@@ -133,7 +144,19 @@ async def handle_audio_command(client, message):
         return
 
     toggles = await db.get_feature_toggles()
-    if not toggles.get("audio_editor", True):
+    allowed = toggles.get("audio_editor", True)
+
+    if Config.PUBLIC_MODE and not allowed:
+        user_doc = await db.get_user(user_id)
+        if user_doc and user_doc.get("is_premium"):
+            plan_name = user_doc.get("premium_plan", "standard")
+            config = await db.get_public_config()
+            if config.get("premium_system_enabled", False):
+                plan_settings = config.get(f"premium_{plan_name}", {})
+                if plan_settings.get("features", {}).get("audio_editor", False):
+                    allowed = True
+
+    if not allowed:
         await message.reply_text("❌ This feature is currently disabled by the Admin.")
         return
 
@@ -185,7 +208,19 @@ async def handle_convert_command(client, message):
         return
 
     toggles = await db.get_feature_toggles()
-    if not toggles.get("file_converter", True):
+    allowed = toggles.get("file_converter", True)
+
+    if Config.PUBLIC_MODE and not allowed:
+        user_doc = await db.get_user(user_id)
+        if user_doc and user_doc.get("is_premium"):
+            plan_name = user_doc.get("premium_plan", "standard")
+            config = await db.get_public_config()
+            if config.get("premium_system_enabled", False):
+                plan_settings = config.get(f"premium_{plan_name}", {})
+                if plan_settings.get("features", {}).get("file_converter", False):
+                    allowed = True
+
+    if not allowed:
         await message.reply_text("❌ This feature is currently disabled by the Admin.")
         return
 
@@ -214,7 +249,19 @@ async def handle_watermark_command(client, message):
         return
 
     toggles = await db.get_feature_toggles()
-    if not toggles.get("watermarker", True):
+    allowed = toggles.get("watermarker", True)
+
+    if Config.PUBLIC_MODE and not allowed:
+        user_doc = await db.get_user(user_id)
+        if user_doc and user_doc.get("is_premium"):
+            plan_name = user_doc.get("premium_plan", "standard")
+            config = await db.get_public_config()
+            if config.get("premium_system_enabled", False):
+                plan_settings = config.get(f"premium_{plan_name}", {})
+                if plan_settings.get("features", {}).get("watermarker", False):
+                    allowed = True
+
+    if not allowed:
         await message.reply_text("❌ This feature is currently disabled by the Admin.")
         return
 
@@ -276,6 +323,17 @@ async def handle_end_command_unique(client, message):
     toggles = await db.get_feature_toggles()
     show_other = toggles.get("audio_editor", True) or toggles.get("file_converter", True) or toggles.get("watermarker", True) or toggles.get("subtitle_extractor", True)
 
+    if Config.PUBLIC_MODE and not show_other:
+        user_doc = await db.get_user(user_id)
+        if user_doc and user_doc.get("is_premium"):
+            plan_name = user_doc.get("premium_plan", "standard")
+            config = await db.get_public_config()
+            if config.get("premium_system_enabled", False):
+                plan_settings = config.get(f"premium_{plan_name}", {})
+                pf = plan_settings.get("features", {})
+                if pf.get("audio_editor", True) or pf.get("file_converter", True) or pf.get("watermarker", True) or pf.get("subtitle_extractor", True):
+                    show_other = True
+
     buttons = [
         [InlineKeyboardButton("🎬 Start Renaming Manually", callback_data="start_renaming")]
     ]
@@ -298,15 +356,26 @@ debug("✅ Loaded handler: help_callback")
 async def handle_other_features_menu(client, callback_query):
     await callback_query.answer()
     toggles = await db.get_feature_toggles()
+    user_id = callback_query.from_user.id
+
+    pf = {}
+    if Config.PUBLIC_MODE:
+        user_doc = await db.get_user(user_id)
+        if user_doc and user_doc.get("is_premium"):
+            plan_name = user_doc.get("premium_plan", "standard")
+            config = await db.get_public_config()
+            if config.get("premium_system_enabled", False):
+                plan_settings = config.get(f"premium_{plan_name}", {})
+                pf = plan_settings.get("features", {})
 
     buttons = []
-    if toggles.get("audio_editor", True):
+    if toggles.get("audio_editor", True) or pf.get("audio_editor", False):
         buttons.append([InlineKeyboardButton("🎵 Audio Metadata Editor", callback_data="audio_editor_menu")])
-    if toggles.get("file_converter", True):
+    if toggles.get("file_converter", True) or pf.get("file_converter", False):
         buttons.append([InlineKeyboardButton("🔀 File Converter", callback_data="file_converter_menu")])
-    if toggles.get("watermarker", True):
+    if toggles.get("watermarker", True) or pf.get("watermarker", False):
         buttons.append([InlineKeyboardButton("© Image Watermarker", callback_data="watermarker_menu")])
-    if toggles.get("subtitle_extractor", True):
+    if toggles.get("subtitle_extractor", True) or pf.get("subtitle_extractor", False):
         buttons.append([InlineKeyboardButton("📝 Subtitle Extractor", callback_data="subtitle_extractor_menu")])
 
     buttons.append([InlineKeyboardButton("❌ Close", callback_data="help_close")])
