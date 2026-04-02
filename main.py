@@ -3,7 +3,7 @@
 ║                    Developed by 𝕏0L0™ (@davdxpx)                         ║
 ║     © 2026 XTV Network Global. All Rights Reserved.                      ║
 ║                                                                          ║
-║  Project: 𝕏TV Rename Bot                                                 ║
+║  Project: 𝕏TV MediaStudio™                                                 ║
 ║  Author: 𝕏0L0™                                                           ║
 ║  Telegram: @davdxpx                                                      ║
 ║  Channel: @XTVbots                                                       ║
@@ -25,7 +25,7 @@ from utils.log import get_logger
 logger = get_logger("main")
 
 app = Client(
-    "xtv_rename_bot",
+    "xtv_mediastudio",
     api_id=Config.API_ID,
     api_hash=Config.API_HASH,
     bot_token=Config.BOT_TOKEN,
@@ -41,7 +41,7 @@ if __name__ == "__main__":
         logger.error("BOT_TOKEN is not set!")
         exit(1)
 
-    logger.info("Starting 𝕏TV Rename Bot...")
+    logger.info("Starting 𝕏TV MediaStudio™...")
     app.start()
 
     try:
@@ -177,7 +177,7 @@ if __name__ == "__main__":
 
     startup_msg = (
         f"\n{'='*60}\n"
-        f"🚀 𝕏TV Rename Bot {Config.VERSION} Initialization\n"
+        f"🚀 𝕏TV MediaStudio™ {Config.VERSION} Initialization\n"
         f"{'-'*60}\n"
         f"⚙️  Core Settings:\n"
         f"   • Debug Mode  : {'🟢 ON' if Config.DEBUG_MODE else '🔴 OFF'}\n"

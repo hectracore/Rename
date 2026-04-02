@@ -79,7 +79,7 @@ async def info_command(client, message):
         return
 
     config = await db.get_public_config()
-    bot_name = config.get("bot_name", "𝕏TV Rename Bot")
+    bot_name = config.get("bot_name", "𝕏TV MediaStudio™")
     community_name = config.get("community_name", "Our Community")
     support_contact = config.get("support_contact", "@davdxpx")
 

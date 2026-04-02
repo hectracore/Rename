@@ -25,7 +25,7 @@ async def handle_start_command_unique(client, message):
         if not (user_id == Config.CEO_ID or user_id in Config.ADMIN_IDS):
             logger.warning(f"Unauthorized access by {user_id}")
             return
-        bot_name = "**𝕏TV Rename Bot**"
+        bot_name = "**𝕏TV MediaStudio™**"
         community_name = "official XTV"
     else:
         config = await db.get_public_config()
@@ -35,7 +35,7 @@ async def handle_start_command_unique(client, message):
 
         await check_and_send_welcome(client, message, config)
 
-        bot_name = f"**{config.get('bot_name', 'XTV Rename Bot')}**"
+        bot_name = f"**{config.get('bot_name', '𝕏TV MediaStudio™')}**"
         community_name = config.get("community_name", "Our Community")
 
     is_new_user = False
@@ -317,7 +317,7 @@ async def handle_help_command_unique(client, message):
 
     await message.reply_text(
         "**📖 Help & Guide**\n\n"
-        "Welcome to the Rename Bot Guide!\n"
+        "Welcome to the MediaStudio Guide!\n"
         "Whether you are organizing a massive media library of popular series and movies, "
         "or just want to rename and manage your **personal home videos** and files, I can help!\n\n"
         "Please select a topic below to learn more:",
@@ -433,7 +433,7 @@ async def handle_help_callbacks(client, callback_query):
         try:
             await callback_query.message.edit_text(
                 "**📖 Help & Guide**\n\n"
-                "Welcome to the Rename Bot Guide!\n"
+                "Welcome to the MediaStudio Guide!\n"
                 "Whether you are organizing a massive media library of popular series and movies, "
                 "or just want to rename and manage your **personal home videos** and files, I can help!\n\n"
                 "Please select a topic below to learn more:",

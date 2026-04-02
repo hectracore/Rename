@@ -8,7 +8,7 @@ from utils.state import update_data
 async def send_force_sub_gate(client, message, config):
     user_id = message.from_user.id
 
-    bot_name = config.get("bot_name", "XTV Rename Bot")
+    bot_name = config.get("bot_name", "𝕏TV MediaStudio™")
     community_name = config.get("community_name", "Our Community")
 
     banner_file_id = config.get("force_sub_banner_file_id")

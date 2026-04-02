@@ -1,6 +1,6 @@
 services:
   - type: worker
-    name: xtv-rename-bot
+    name: xtv-mediastudio
     env: docker
     dockerfilePath: ./Dockerfile
     plan: free # Free tier by default, does not require a credit card

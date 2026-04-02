@@ -47,13 +47,13 @@ class Database:
         if global_doc and global_doc.get("migration_to_users_done"):
             return
 
-        old_settings = self.db["rename_bot_settings"]
+        old_settings = self.db["xtv_mediastudio_settings"]
         count = await old_settings.count_documents({})
         if count == 0:
             await self.settings.update_one({"_id": "global_settings"}, {"$set": {"migration_to_users_done": True}}, upsert=True)
             return
 
-        logger.info("Migrating old rename_bot_settings to user_settings and users collections...")
+        logger.info("Migrating old xtv_mediastudio_settings to user_settings and users collections...")
 
         async for doc in old_settings.find({}):
             doc_id = doc.get("_id")
@@ -421,7 +421,7 @@ class Database:
             if not doc:
                 default_config = {
                     "_id": "public_mode_config",
-                    "bot_name": "𝕏TV Rename Bot",
+                    "bot_name": "𝕏TV MediaStudio™",
                     "community_name": "Our Community",
                     "support_contact": "@davdxpx",
                     "force_sub_channel": None,

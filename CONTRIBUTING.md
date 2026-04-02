@@ -1,6 +1,6 @@
-# Contributing to 𝕏TV Rename Bot
+# Contributing to 𝕏TV MediaStudio™
 
-Welcome to the 𝕏TV Rename Bot project! We are thrilled that you are interested in contributing to this advanced, business-class media management solution. Whether you're fixing a bug, adding a new multipurpose file utility, or enhancing the 𝕏TV Pro™ integration, your contributions help make this project great.
+Welcome to the 𝕏TV MediaStudio™ project! We are thrilled that you are interested in contributing to this advanced, business-class media management solution. Whether you're fixing a bug, adding a new multipurpose file utility, or enhancing the 𝕏TV Pro™ integration, your contributions help make this project great.
 
 This project is maintained by 𝕏0L0™ (@davdxpx) for the **𝕏TV Network Global**.
 

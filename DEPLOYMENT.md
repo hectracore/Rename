@@ -1,6 +1,6 @@
 # 🛠 Deployment Guide
 
-Welcome to the **𝕏TV Rename Bot** deployment documentation! This guide provides standardized, beginner-friendly instructions for hosting your bot on various platforms.
+Welcome to the **𝕏TV MediaStudio™** deployment documentation! This guide provides standardized, beginner-friendly instructions for hosting your bot on various platforms.
 
 Because this bot downloads media, processes it with **FFmpeg**, and uploads it back to Telegram, it consumes significant **RAM** and **Bandwidth (Egress)**. Keep this in mind when choosing a provider!
 
@@ -103,8 +103,8 @@ Whether you are using a $5 DigitalOcean Droplet, an AWS EC2 instance, or any oth
    ```
 3. **Download the Bot:**
    ```bash
-   git clone https://github.com/davdxpx/XTVrename-bot.git
-   cd XTVrename-bot
+   git clone https://github.com/davdxpx/XTV-MediaStudio.git
+   cd XTV-MediaStudio
    ```
 4. **Configure Settings:**
    ```bash
