@@ -9,7 +9,43 @@ logger = get_logger("utils.detect")
 # === Helper Functions ===
 def analyze_filename(filename):
     try:
-        guess = guessit(filename)
+        # Pre-process filename to handle some edge cases guessit misses
+        modified_f = filename
+
+        # Pattern 1: X.YY or XX.YY (e.g., 8.01 -> S08E01)
+        match = re.search(r'(?:^|[^\d])(\d{1,2})\.(\d{2})(?:[^\d]|$)', modified_f)
+        is_date = False
+        if match:
+            start_idx = match.start(1)
+            if start_idx >= 5:
+                preceding = modified_f[start_idx-5:start_idx]
+                if re.match(r'\d{4}\.', preceding):  # Avoid YYYY.MM.DD
+                    is_date = True
+            if not is_date:
+                season = match.group(1)
+                episode = match.group(2)
+                prefix = modified_f[:match.start(1)]
+                suffix = modified_f[match.end(2):]
+                modified_f = f"{prefix} S{int(season):02d}E{int(episode):02d} {suffix}"
+
+        # Pattern 2: X_YY, XX_YY, X-YY, XX-YY, X~YY, XX~YY (e.g., 8-01 -> S08E01)
+        # Avoid breaking standard formats like 2x01-02 by checking if it's preceded by 'x'
+        match = re.search(r'(?:^|[^\dx])(\d{1,2})[_~-](\d{2})(?:[^\d]|$)', modified_f, re.IGNORECASE)
+        is_date = False
+        if match:
+            start_idx = match.start(1)
+            if start_idx >= 5:
+                preceding = modified_f[start_idx-5:start_idx]
+                if re.match(r'\d{4}[_~-]', preceding):  # Avoid YYYY-MM-DD
+                    is_date = True
+            if not is_date:
+                season = match.group(1)
+                episode = match.group(2)
+                prefix = modified_f[:match.start(1)]
+                suffix = modified_f[match.end(2):]
+                modified_f = f"{prefix} S{int(season):02d}E{int(episode):02d} {suffix}"
+
+        guess = guessit(modified_f)
 
         media_type = "movie"
         if guess.get("type") == "episode":
@@ -89,11 +125,26 @@ def analyze_filename(filename):
                     elif kw == "AC3": extracted_audio.append("AC3")
                     elif kw == "ATMOS": extracted_audio.append("Atmos")
 
+        season_val = guess.get("season")
+        episode_val = guess.get("episode")
+
+        # Post-process list-like episodes if guessit misidentified "Show - 08 - 01" as [8, 1]
+        if isinstance(episode_val, list) and len(episode_val) == 2 and not season_val:
+            season_val = episode_val[0]
+            episode_val = episode_val[1]
+        elif isinstance(episode_val, list) and len(episode_val) > 0:
+            # If it's still a list (e.g. S01E01-E02), just take the first episode or handle it as needed.
+            # Currently the bot flow expects a single integer for episode. We will extract the first.
+            episode_val = episode_val[0]
+
+        if isinstance(season_val, list) and len(season_val) > 0:
+            season_val = season_val[0]
+
         return {
             "title": guess.get("title"),
             "year": guess.get("year"),
-            "season": guess.get("season"),
-            "episode": guess.get("episode"),
+            "season": season_val,
+            "episode": episode_val,
             "quality": quality,
             "type": media_type,
             "is_subtitle": is_subtitle,
