@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  xtv-rename-bot:
+  xtv-mediastudio:
     build: .
-    container_name: xtv-rename-bot
+    container_name: xtv-mediastudio
     restart: unless-stopped
     env_file:
       - .env

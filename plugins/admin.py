@@ -236,7 +236,7 @@ async def admin_panel(client, message):
         text = (
             "🛠 **𝕏TV Admin Panel** 🛠\n\n"
             "Welcome, CEO.\n"
-            "Manage global settings for the 𝕏TV Rename Bot.\n"
+            "Manage global settings for the 𝕏TV MediaStudio™.\n"
             "These settings affect all files processed by the bot."
         )
 
@@ -2163,7 +2163,7 @@ async def admin_callback(client, callback_query):
                 await callback_query.message.edit_text(
                     "🛠 **𝕏TV Admin Panel** 🛠\n\n"
                     "Welcome, CEO.\n"
-                    "Manage global settings for the 𝕏TV Rename Bot.\n"
+                    "Manage global settings for the 𝕏TV MediaStudio™.\n"
                     "These settings affect all files processed by the bot.",
                     reply_markup=get_admin_main_menu(pro_session, Config.PUBLIC_MODE),
                 )

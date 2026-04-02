@@ -173,10 +173,10 @@ async def on_user_join_channel(client, update):
     await send_starter_setup_message(client, user.id, user.first_name)
 
 async def send_starter_setup_message(client, user_id, first_name=""):
-    bot_name = "**𝕏TV Rename Bot**"
+    bot_name = "**𝕏TV MediaStudio™**"
     if Config.PUBLIC_MODE:
         config = await db.get_public_config()
-        bot_name = f"**{config.get('bot_name', 'XTV Rename Bot')}**"
+        bot_name = f"**{config.get('bot_name', '𝕏TV MediaStudio™')}**"
 
     text = (
         f"👋 **Welcome to {bot_name}, {first_name}!**\n\n"

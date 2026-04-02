@@ -1,19 +1,19 @@
-# 𝕏TV Rename Bot 🚀
+# 𝕏TV MediaStudio™ 🚀
 
 > **Business-Class Media Management Solution**
 > *Developed by [𝕏0L0™](https://t.me/davdxpx) for the [𝕏TV Network](https://t.me/XTVglobal)*
 
 <p align="center">
-  <img src="./assets/banner.png" alt="𝕏TV Rename Bot Banner" width="100%">
+  <img src="./assets/banner.png" alt="𝕏TV MediaStudio™ Banner" width="100%">
 </p>
 
 [![Python](https://img.shields.io/badge/Python-3.9+-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Pyrogram](https://img.shields.io/badge/Pyrogram-Latest-blue.svg?logo=telegram&logoColor=white)](https://docs.pyrogram.org/)
 [![FFmpeg](https://img.shields.io/badge/FFmpeg-Included-green.svg?logo=ffmpeg&logoColor=white)](https://ffmpeg.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)](https://www.docker.com/)
-[![License](https://img.shields.io/badge/License-XTV_Public_v2.0-red.svg)](https://github.com/davdxpx/XTVrename-bot/blob/main/LICENSE)
+[![License](https://img.shields.io/badge/License-XTV_Public_v2.0-red.svg)](https://github.com/davdxpx/XTV-MediaStudio/blob/main/LICENSE)
 
-The **𝕏TV Rename Bot** is a high-performance, enterprise-grade **Telegram Bot** engineered for automated media processing, file renaming, and video metadata editing. It combines robust **FFmpeg** metadata injection with intelligent file renaming algorithms, designed specifically for maintaining large-scale media libraries on Telegram. Whether you need an **auto renamer bot**, a **TMDb movie scraper**, or a **video metadata editor**, XTV Rename Bot is the ultimate **media management solution**.
+The **𝕏TV MediaStudio™** is a high-performance, enterprise-grade **Telegram Bot** engineered for automated media processing, file renaming, and video metadata editing. It combines robust **FFmpeg** metadata injection with intelligent file renaming algorithms, designed specifically for maintaining large-scale media libraries on Telegram. Whether you need an **auto renamer bot**, a **TMDb movie scraper**, or a **video metadata editor**, 𝕏TV MediaStudio™ is the ultimate **media management solution**.
 
 ## 🌟 Key Features
 
@@ -66,7 +66,7 @@ The **𝕏TV Rename Bot** is a high-performance, enterprise-grade **Telegram Bot
 
 ## 🛠 Deployment Guide
 
-We have created comprehensive, beginner-friendly, step-by-step guides for deploying the 𝕏TV Rename Bot across multiple platforms. 
+We have created comprehensive, beginner-friendly, step-by-step guides for deploying the 𝕏TV MediaStudio™ across multiple platforms.
 
 ### 👉 [Click Here for the Full Deployment Guide](DEPLOYMENT.md) 👈
 
@@ -90,7 +90,7 @@ Create a `.env` file in the root directory. You will need a **MongoDB** instance
 
 ## 🚀 𝕏TV Pro™ Setup (4GB File Support)
 
-To bypass Telegram's standard 2GB bot upload limit, the **𝕏TV Rename Bot** features a built-in **𝕏TV Pro™** mode. This mode uses a Premium Telegram account (Userbot) to act as a seamless tunnel for processing and delivering files up to 4GB.
+To bypass Telegram's standard 2GB bot upload limit, the **𝕏TV MediaStudio™** features a built-in **𝕏TV Pro™** mode. This mode uses a Premium Telegram account (Userbot) to act as a seamless tunnel for processing and delivering files up to 4GB.
 
 **How to Setup:**
 1. Send `/admin` to your bot.
@@ -104,7 +104,7 @@ To bypass Telegram's standard 2GB bot upload limit, the **𝕏TV Rename Bot** fe
 
 ## 🌍 Public Mode vs Private Mode
 
-The XTV Rename Bot can operate in two distinct modes via the `PUBLIC_MODE` environment variable. **It is highly recommended to choose a mode initially and stick with it**, as the database structure and bot functionality changes drastically between the two.
+The 𝕏TV MediaStudio™ can operate in two distinct modes via the `PUBLIC_MODE` environment variable. **It is highly recommended to choose a mode initially and stick with it**, as the database structure and bot functionality changes drastically between the two.
 
 ### 🔒 Private Mode (`PUBLIC_MODE=False` - Default)
 * **Access**: Only the `CEO_ID` and `ADMIN_IDS` can use the bot.
