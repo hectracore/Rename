@@ -47,13 +47,13 @@ class Database:
         if global_doc and global_doc.get("migration_to_users_done"):
             return
 
-        old_settings = self.db["xtv_mediastudio_settings"]
+        old_settings = self.db["MediaStudio-Settings"]
         count = await old_settings.count_documents({})
         if count == 0:
             await self.settings.update_one({"_id": "global_settings"}, {"$set": {"migration_to_users_done": True}}, upsert=True)
             return
 
-        logger.info("Migrating old xtv_mediastudio_settings to user_settings and users collections...")
+        logger.info("Migrating old MediaStudio-Settings to user_settings and users collections...")
 
         async for doc in old_settings.find({}):
             doc_id = doc.get("_id")
