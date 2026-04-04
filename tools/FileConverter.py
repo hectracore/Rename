@@ -65,10 +65,20 @@ async def handle_convert_to(client, callback_query):
     clear_session(user_id)
 
 # === Functions ===
-async def convert(input_path: str, output_path: str, target_format: str, progress_callback=None) -> tuple[bool, bytes]:
+async def convert(input_path: str, output_dir: str, safe_title: str, target_format: str, progress_callback=None) -> tuple[bool, bytes, str, str]:
     """
     Converts a media file to the target format using FFmpeg.
+    Returns: (success, stderr, output_path, meta_title)
     """
+    import os
+    target_ext = f".{target_format}"
+    if target_format in ["x264", "x265", "audionorm"]:
+        target_ext = ".mkv"
+
+    final_filename = f"{safe_title}{target_ext}"
+    meta_title = f"{safe_title}"
+    output_path = os.path.join(output_dir, final_filename)
+
     cmd = ["ffmpeg", "-y", "-i", input_path]
 
     if target_format == "mp3":
@@ -88,7 +98,8 @@ async def convert(input_path: str, output_path: str, target_format: str, progres
 
     cmd.append(output_path)
 
-    return await execute_ffmpeg(cmd, progress_callback=progress_callback)
+    success, stderr = await execute_ffmpeg(cmd, progress_callback=progress_callback)
+    return success, stderr, output_path, meta_title
 
 # --------------------------------------------------------------------------
 # Developed by 𝕏0L0™ (@davdxpx) | © 2026 XTV Network Global

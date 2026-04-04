@@ -670,27 +670,9 @@ class TaskProcessor:
             final_filename = f"{base_name}{ext}"
             meta_title = base_name
 
-        elif self.media_type == "audio":
-            final_filename = f"{safe_title}{ext}"
-            meta_title = self.metadata.get("title", safe_title)
-
-        elif self.media_type == "convert":
-            target_format = self.data.get('target_format', 'mkv')
-
-            target_ext = f".{target_format}"
-            if target_format in ["x264", "x265", "audionorm"]:
-                target_ext = ".mkv"
-
-            final_filename = f"{safe_title}{target_ext}"
-            meta_title = f"{safe_title}"
-
-        elif self.media_type == "extract_subtitles":
-            final_filename = f"{safe_title}_subtitles.srt"
-            meta_title = f"{safe_title} Subtitles"
-
-        elif self.media_type == "watermark":
-            final_filename = f"{safe_title}_watermarked{ext}"
-            meta_title = f"{safe_title}"
+        elif self.media_type in ["audio", "convert", "extract_subtitles", "watermark"]:
+            final_filename = "to_be_generated"
+            meta_title = "to_be_generated"
 
         elif self.media_type == "series":
             if self.is_subtitle:
@@ -801,21 +783,7 @@ class TaskProcessor:
         )
 
     async def _process_media(self) -> bool:
-        if self.media_type == "convert":
-            await self._update_status(
-                "🔀 **Converting Media Format**\n\n"
-                "Initializing video stream processor...\n"
-                f"━━━━━━━━━━━━━━━━━━━━\n"
-                f"{XTVEngine.get_signature(mode=self.mode)}"
-            )
-        elif self.media_type == "extract_subtitles":
-            await self._update_status(
-                "📝 **Extracting Subtitles**\n\n"
-                "Scanning video streams for text tracks...\n"
-                f"━━━━━━━━━━━━━━━━━━━━\n"
-                f"{XTVEngine.get_signature(mode=self.mode)}"
-            )
-        else:
+        if self.media_type not in ["convert", "extract_subtitles", "audio", "watermark"]:
             await self._update_status(
                 "⚙️ **Executing Transcoding Matrix**\n\n"
                 "Injecting metadata and optimizing container...\n"
@@ -824,7 +792,7 @@ class TaskProcessor:
             )
 
         total_duration = 0
-        if self.media_type == "convert" or self.media_type == "extract_subtitles":
+        if self.media_type == "convert" or self.media_type == "extract_subtitles" or self.media_type == "watermark":
             try:
                 probe, _ = await probe_file(self.input_path)
                 if probe and "format" in probe and "duration" in probe["format"]:
@@ -871,36 +839,78 @@ class TaskProcessor:
                 except Exception as e:
                     logger.debug(f"Failed to update ffmpeg progress: {e}")
 
+        safe_title = re.sub(r'[\\/*?:"<>|,;\'!]', "", self.title)
+        safe_title = safe_title.replace("&", "and")
+
+        ext = ".mkv" if not self.is_subtitle else ".srt"
+        if not self.is_subtitle and self.original_name:
+            orig_ext = os.path.splitext(self.original_name)[1].lower()
+            if orig_ext:
+                ext = orig_ext
+        if self.message.photo:
+            ext = ".jpg"
+
         if self.media_type == "watermark":
+            await self._update_status(
+                "© **Applying Watermark**\n\n"
+                "Processing media with customized overlay...\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"{XTVEngine.get_signature(mode=self.mode)}"
+            )
             from tools.ImageWatermarker import watermark
             wtype = self.data.get("watermark_type")
             wcontent = self.data.get("watermark_content")
             pos = self.data.get("watermark_position", "bottomright")
             size = self.data.get("watermark_size", "medium")
 
-            success, stderr = await watermark(
-                self.input_path, self.output_path, wtype, wcontent, pos, size,
-                self.download_dir, self.user_id, self.active_client, progress_callback=ffmpeg_progress
+            success, stderr, self.output_path, meta_title = await watermark(
+                self.input_path, self.download_dir, safe_title, ext, wtype, wcontent, pos, size,
+                self.user_id, self.active_client, progress_callback=ffmpeg_progress
             )
+            self.metadata["title"] = meta_title
+
         elif self.media_type == "convert":
+            await self._update_status(
+                "🔀 **Converting Media Format**\n\n"
+                "Initializing video stream processor...\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"{XTVEngine.get_signature(mode=self.mode)}"
+            )
             from tools.FileConverter import convert
             target_format = self.data.get("target_format", "mkv")
 
-            success, stderr = await convert(
-                self.input_path, self.output_path, target_format, progress_callback=ffmpeg_progress
+            success, stderr, self.output_path, meta_title = await convert(
+                self.input_path, self.download_dir, safe_title, target_format, progress_callback=ffmpeg_progress
             )
+            self.metadata["title"] = meta_title
+
         elif self.media_type == "extract_subtitles":
+            await self._update_status(
+                "📝 **Extracting Subtitles**\n\n"
+                "Scanning video streams for text tracks...\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"{XTVEngine.get_signature(mode=self.mode)}"
+            )
             from tools.SubtitleExtractor import extract_subtitles
 
-            success, stderr = await extract_subtitles(
-                self.input_path, self.output_path, progress_callback=ffmpeg_progress
+            success, stderr, self.output_path, meta_title = await extract_subtitles(
+                self.input_path, self.download_dir, safe_title, progress_callback=ffmpeg_progress
             )
+            self.metadata["title"] = meta_title
+
         elif self.media_type == "audio":
+            await self._update_status(
+                "🎵 **Editing Audio Metadata**\n\n"
+                "Injecting tags and cover art...\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"{XTVEngine.get_signature(mode=self.mode)}"
+            )
             from tools.AudioMetadataEditor import edit_audio_metadata
             thumb = self.thumb_path if (self.thumb_path and os.path.exists(self.thumb_path)) else None
-            success, stderr = await edit_audio_metadata(
-                self.input_path, self.output_path, self.metadata, thumb, progress_callback=ffmpeg_progress
+            success, stderr, self.output_path, meta_title = await edit_audio_metadata(
+                self.input_path, self.download_dir, safe_title, ext, self.metadata, thumb, progress_callback=ffmpeg_progress
             )
+            self.metadata["title"] = meta_title
         else:
             cmd, err = await generate_ffmpeg_command(
                 input_path=self.input_path,

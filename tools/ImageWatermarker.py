@@ -126,10 +126,15 @@ async def handle_watermark_size(client, callback_query):
     clear_session(user_id)
 
 # === Functions ===
-async def watermark(input_path: str, output_path: str, watermark_type: str, watermark_content: str, position: str = "bottomright", size: str = "medium", download_dir: str = "", user_id: int = 0, active_client=None, progress_callback=None) -> tuple[bool, bytes]:
+async def watermark(input_path: str, output_dir: str, safe_title: str, ext: str, watermark_type: str, watermark_content: str, position: str = "bottomright", size: str = "medium", user_id: int = 0, active_client=None, progress_callback=None) -> tuple[bool, bytes, str, str]:
     """
     Applies a text or image watermark to the input media using FFmpeg.
+    Returns: (success, stderr, output_path, meta_title)
     """
+    final_filename = f"{safe_title}_watermarked{ext}"
+    meta_title = f"{safe_title}"
+    output_path = os.path.join(output_dir, final_filename)
+
     cmd = ["ffmpeg", "-y", "-i", input_path]
 
     if watermark_type == "text":
@@ -165,7 +170,7 @@ async def watermark(input_path: str, output_path: str, watermark_type: str, wate
 
     else:
         watermark_path = os.path.join(
-            download_dir, f"{user_id}_wm_overlay.png"
+            output_dir, f"{user_id}_wm_overlay.png"
         )
         if watermark_content and active_client:
             await active_client.download_media(
@@ -205,7 +210,8 @@ async def watermark(input_path: str, output_path: str, watermark_type: str, wate
             logger.error("Watermark overlay image missing.")
 
     cmd.append(output_path)
-    return await execute_ffmpeg(cmd, progress_callback=progress_callback)
+    success, stderr = await execute_ffmpeg(cmd, progress_callback=progress_callback)
+    return success, stderr, output_path, meta_title
 
 # --------------------------------------------------------------------------
 # Developed by 𝕏0L0™ (@davdxpx) | © 2026 XTV Network Global
