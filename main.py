@@ -45,9 +45,12 @@ import tools.SubtitleExtractor
 def register_tool_handlers(client, module):
     for name in dir(module):
         obj = getattr(module, name)
-        if hasattr(obj, "handlers"):
-            for handler, group in obj.handlers:
-                client.add_handler(handler, group)
+        # Pyrogram stores handlers as a list of tuples (handler, group) on the decorated function itself.
+        if callable(obj) and hasattr(obj, "handlers") and isinstance(obj.handlers, list):
+            for item in obj.handlers:
+                if isinstance(item, tuple) and len(item) == 2:
+                    handler, group = item
+                    client.add_handler(handler, group)
 
 register_tool_handlers(app, tools.FileConverter)
 register_tool_handlers(app, tools.AudioMetadataEditor)
