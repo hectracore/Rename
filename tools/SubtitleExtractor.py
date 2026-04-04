@@ -63,12 +63,19 @@ async def handle_subtitle_extractor_upload(client, message):
         raise StopPropagation
 
 # === Functions ===
-async def extract_subtitles(input_path: str, output_path: str, progress_callback=None) -> tuple[bool, bytes]:
+async def extract_subtitles(input_path: str, output_dir: str, safe_title: str, progress_callback=None) -> tuple[bool, bytes, str, str]:
     """
     Extracts subtitles from a media file using FFmpeg.
+    Returns: (success, stderr, output_path, meta_title)
     """
+    import os
+    final_filename = f"{safe_title}_subtitles.srt"
+    meta_title = f"{safe_title} Subtitles"
+    output_path = os.path.join(output_dir, final_filename)
+
     cmd = ["ffmpeg", "-y", "-i", input_path, "-map", "0:s:0?", "-c:s", "srt", output_path]
-    return await execute_ffmpeg(cmd, progress_callback=progress_callback)
+    success, stderr = await execute_ffmpeg(cmd, progress_callback=progress_callback)
+    return success, stderr, output_path, meta_title
 
 # --------------------------------------------------------------------------
 # Developed by 𝕏0L0™ (@davdxpx) | © 2026 XTV Network Global

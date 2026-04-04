@@ -142,10 +142,16 @@ async def render_audio_menu(client, message, user_id):
             pass
 
 # === Functions ===
-async def edit_audio_metadata(input_path: str, output_path: str, metadata: dict, thumb_path: str = None, progress_callback=None) -> tuple[bool, bytes]:
+async def edit_audio_metadata(input_path: str, output_dir: str, safe_title: str, ext: str, metadata: dict, thumb_path: str = None, progress_callback=None) -> tuple[bool, bytes, str, str]:
     """
     Edits audio metadata using FFmpeg.
+    Returns: (success, stderr, output_path, meta_title)
     """
+    import os
+    final_filename = f"{safe_title}{ext}"
+    meta_title = metadata.get("title", safe_title)
+    output_path = os.path.join(output_dir, final_filename)
+
     cmd, err = await generate_ffmpeg_command(
         input_path=input_path,
         output_path=output_path,
@@ -154,9 +160,10 @@ async def edit_audio_metadata(input_path: str, output_path: str, metadata: dict,
     )
 
     if not cmd:
-        return False, str(err).encode()
+        return False, str(err).encode(), output_path, meta_title
 
-    return await execute_ffmpeg(cmd, progress_callback=progress_callback)
+    success, stderr = await execute_ffmpeg(cmd, progress_callback=progress_callback)
+    return success, stderr, output_path, meta_title
 
 # --------------------------------------------------------------------------
 # Developed by 𝕏0L0™ (@davdxpx) | © 2026 XTV Network Global
