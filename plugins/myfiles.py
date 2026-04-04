@@ -13,12 +13,12 @@ logger = get_logger("plugins.myfiles")
 # === Helper Functions ===
 async def set_myfiles_state(user_id: int, state_dict: dict):
     if not state_dict:
-        await db.settings.update_one({"_id": db._get_doc_id(user_id)}, {"$unset": {"myfiles_state": ""}})
+        await db.users.update_one({"user_id": user_id}, {"$unset": {"myfiles_state": ""}})
     else:
-        await db.settings.update_one({"_id": db._get_doc_id(user_id)}, {"$set": {"myfiles_state": state_dict}}, upsert=True)
+        await db.users.update_one({"user_id": user_id}, {"$set": {"myfiles_state": state_dict}}, upsert=True)
 
 async def get_myfiles_state(user_id: int) -> dict:
-    doc = await db.settings.find_one({"_id": db._get_doc_id(user_id)})
+    doc = await db.users.find_one({"user_id": user_id})
     if doc and "myfiles_state" in doc:
         return doc["myfiles_state"]
     return {}
@@ -109,7 +109,7 @@ async def build_files_list_keyboard(user_id: int, filter_query: dict, page: int,
     buttons.append([InlineKeyboardButton("🔙 Back", callback_data=back_data)])
     return buttons, total_files
 
-@Client.on_message(filters.text & filters.private, group=2)
+@Client.on_message(filters.text & filters.private, group=1)
 async def myfiles_text_handler(client: Client, message: Message):
     user_id = message.from_user.id
 
@@ -196,9 +196,11 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
         await callback_query.answer("Access Denied", show_alert=True)
         return
 
-    # We shouldn't blindly overwrite the whole state with "last_menu" if there's a "state" going on.
-    # But usually menus overwrite it anyway.
-    await set_myfiles_state(user_id, {"last_menu": data})
+    # Only update last_menu if it's a structural navigation callback
+    if data in ["myfiles_main", "myfiles_cat_recent", "myfiles_cat_movies", "myfiles_cat_series", "myfiles_cat_custom"] or data.startswith("myfiles_folder_") or data.startswith("myfiles_page_"):
+        state_dict = await get_myfiles_state(user_id)
+        state_dict["last_menu"] = data
+        await set_myfiles_state(user_id, state_dict)
 
     if data == "myfiles_main":
         text, markup = await get_myfiles_main_menu(user_id)
