@@ -93,7 +93,7 @@ async def handle_start_command_unique(client, message):
     ]
     if show_other:
         buttons.append([InlineKeyboardButton("✨ Other Features", callback_data="other_features_menu")])
-    if Config.PUBLIC_MODE:
+    if Config.PUBLIC_MODE and is_premium_user:
         buttons.append([InlineKeyboardButton("💎 Premium Dashboard", callback_data="user_premium_menu")])
     buttons.append([InlineKeyboardButton("📖 Help & Guide", callback_data="help_guide")])
 
@@ -111,20 +111,19 @@ async def handle_start_command_unique(client, message):
     else:
         await message.reply_text(
             f"{bot_name}\n\n"
-            f"Welcome to the {community_name} file renaming tool.\n"
-            "This bot provides professional renaming and metadata management.\n\n"
-            "💡 **Tip:** You don't need to click anything to begin! Simply send or forward a file directly to me, and I will auto-detect the details.\n\n"
-            "Click below to start manually or to view the guide.",
+            f"Welcome to the {community_name} media processing and management bot.\n"
+            f"This bot provides professional tools to organize and modify your files.\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"💡 **Tip:** You don't need to click anything to begin!\n"
+            f"Simply send or forward a file directly to me, and I will auto-detect the details.\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"Click below to start manually or to view the guide.",
             reply_markup=InlineKeyboardMarkup(buttons),
         )
 
 @Client.on_message(filters.command(["r", "rename"]) & filters.private, group=0)
 async def handle_rename_command(client, message):
     user_id = message.from_user.id
-    if not Config.PUBLIC_MODE and not (
-        user_id == Config.CEO_ID or user_id in Config.ADMIN_IDS
-    ):
-        return
     from plugins.flow import handle_start_renaming
 
     class MockCallbackQuery:
@@ -144,10 +143,6 @@ async def handle_rename_command(client, message):
 @Client.on_message(filters.command(["g", "general"]) & filters.private, group=0)
 async def handle_general_command(client, message):
     user_id = message.from_user.id
-    if not Config.PUBLIC_MODE and not (
-        user_id == Config.CEO_ID or user_id in Config.ADMIN_IDS
-    ):
-        return
     from plugins.flow import handle_type_general
 
     class MockCallbackQuery:
@@ -167,10 +162,6 @@ async def handle_general_command(client, message):
 @Client.on_message(filters.command(["a", "audio"]) & filters.private, group=0)
 async def handle_audio_command(client, message):
     user_id = message.from_user.id
-    if not Config.PUBLIC_MODE and not (
-        user_id == Config.CEO_ID or user_id in Config.ADMIN_IDS
-    ):
-        return
 
     toggles = await db.get_feature_toggles()
     allowed = toggles.get("audio_editor", True)
@@ -208,10 +199,6 @@ async def handle_audio_command(client, message):
 @Client.on_message(filters.command(["p", "personal"]) & filters.private, group=0)
 async def handle_personal_command(client, message):
     user_id = message.from_user.id
-    if not Config.PUBLIC_MODE and not (
-        user_id == Config.CEO_ID or user_id in Config.ADMIN_IDS
-    ):
-        return
     from plugins.flow import handle_type_personal
 
     class MockCallbackQuery:
@@ -231,10 +218,6 @@ async def handle_personal_command(client, message):
 @Client.on_message(filters.command(["c", "convert"]) & filters.private, group=0)
 async def handle_convert_command(client, message):
     user_id = message.from_user.id
-    if not Config.PUBLIC_MODE and not (
-        user_id == Config.CEO_ID or user_id in Config.ADMIN_IDS
-    ):
-        return
 
     toggles = await db.get_feature_toggles()
     allowed = toggles.get("file_converter", True)
@@ -272,10 +255,6 @@ async def handle_convert_command(client, message):
 @Client.on_message(filters.command(["w", "watermark"]) & filters.private, group=0)
 async def handle_watermark_command(client, message):
     user_id = message.from_user.id
-    if not Config.PUBLIC_MODE and not (
-        user_id == Config.CEO_ID or user_id in Config.ADMIN_IDS
-    ):
-        return
 
     toggles = await db.get_feature_toggles()
     allowed = toggles.get("watermarker", True)
@@ -316,29 +295,19 @@ async def handle_help_command_unique(client, message):
     logger.debug(f"CMD received: {message.text} from {user_id}")
 
     await message.reply_text(
-        "**📖 Help & Guide**\n\n"
-        "Welcome to the MediaStudio Guide!\n"
+        "**📖 MediaStudio Guide**\n\n"
+        "> Welcome to your complete reference manual.\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
         "Whether you are organizing a massive media library of popular series and movies, "
         "or just want to process and manage your **personal media** and files, I can help!\n\n"
-        "Please select a topic below to learn more:",
+        "Please select a topic below to explore the guide:",
         reply_markup=InlineKeyboardMarkup(
             [
-                [InlineKeyboardButton("🛠 How to Use", callback_data="help_how_to_use")],
-                [
-                    InlineKeyboardButton(
-                        "🤖 Auto-Detect Magic", callback_data="help_auto_detect"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        "📁 Personal Files & Home Videos", callback_data="help_personal"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        "⚙️ Settings & Info", callback_data="help_settings"
-                    )
-                ],
+                [InlineKeyboardButton("🛠 All Tools & Features", callback_data="help_tools")],
+                [InlineKeyboardButton("📁 File Management", callback_data="help_file_management")],
+                [InlineKeyboardButton("🤖 Auto-Detect Magic", callback_data="help_auto_detect")],
+                [InlineKeyboardButton("📄 Personal & General Mode", callback_data="help_general")],
+                [InlineKeyboardButton("⚙️ Settings & Info", callback_data="help_settings")],
                 [InlineKeyboardButton("❌ Close", callback_data="help_close")],
             ]
         ),
@@ -432,61 +401,128 @@ async def handle_help_callbacks(client, callback_query):
     if data == "help_guide":
         try:
             await callback_query.message.edit_text(
-                "**📖 Help & Guide**\n\n"
-                "Welcome to the MediaStudio Guide!\n"
+                "**📖 MediaStudio Guide**\n\n"
+                "> Welcome to your complete reference manual.\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
                 "Whether you are organizing a massive media library of popular series and movies, "
                 "or just want to process and manage your **personal media** and files, I can help!\n\n"
-                "Please select a topic below to learn more:",
+                "Please select a topic below to explore the guide:",
                 reply_markup=InlineKeyboardMarkup(
                     [
-                        [
-                            InlineKeyboardButton(
-                                "🛠 How to Use", callback_data="help_how_to_use"
-                            )
-                        ],
-                        [
-                            InlineKeyboardButton(
-                                "🤖 Auto-Detect Magic", callback_data="help_auto_detect"
-                            )
-                        ],
-                        [
-                            InlineKeyboardButton(
-                                "📁 Personal Files & Home Videos",
-                                callback_data="help_personal",
-                            )
-                        ],
-                        [
-                            InlineKeyboardButton(
-                                "📄 General Mode & Variables",
-                                callback_data="help_general",
-                            )
-                        ],
-                        [
-                            InlineKeyboardButton(
-                                "⚙️ Settings & Info", callback_data="help_settings"
-                            )
-                        ],
+                        [InlineKeyboardButton("🛠 All Tools & Features", callback_data="help_tools")],
+                        [InlineKeyboardButton("📁 File Management", callback_data="help_file_management")],
+                        [InlineKeyboardButton("🤖 Auto-Detect Magic", callback_data="help_auto_detect")],
+                        [InlineKeyboardButton("📄 Personal & General Mode", callback_data="help_general")],
+                        [InlineKeyboardButton("⚙️ Settings & Info", callback_data="help_settings")],
                         [InlineKeyboardButton("❌ Close", callback_data="help_close")],
                     ]
                 ),
             )
         except MessageNotModified:
             pass
-    elif data == "help_how_to_use":
+
+    elif data == "help_tools":
         try:
             await callback_query.message.edit_text(
-                "**🛠 How to Use**\n\n"
-                "1. **The Quick Way**: Simply send or forward any media file directly to me. I will scan the file and start the renaming process.\n\n"
-                "2. **The Manual Way**: Press the 'Start Renaming Manually' button or use `/start` to begin the guided process.\n\n"
-                "3. **Cancel Anytime**: Made a mistake? Use `/end` or the Cancel button at any point to reset your progress.",
+                "**🛠 All Tools & Features**\n\n"
+                "> A complete suite of media processing tools.\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "Here is an overview of everything I can do. Click on any tool below to learn more about how to use it, what it does, and any shortcuts available.",
+                reply_markup=InlineKeyboardMarkup(
+                    [
+                        [InlineKeyboardButton("📁 Rename & Tag Media", callback_data="help_tool_rename")],
+                        [InlineKeyboardButton("🎵 Audio Editor", callback_data="help_tool_audio"),
+                         InlineKeyboardButton("🔀 File Converter", callback_data="help_tool_convert")],
+                        [InlineKeyboardButton("© Image Watermarker", callback_data="help_tool_watermark"),
+                         InlineKeyboardButton("📝 Subtitle Extractor", callback_data="help_tool_subtitle")],
+                        [InlineKeyboardButton("🔙 Back to Help Menu", callback_data="help_guide")]
+                    ]
+                )
+            )
+        except MessageNotModified:
+            pass
+
+    elif data.startswith("help_tool_"):
+        tool = data.split("_")[-1]
+        back_to_tools = [[InlineKeyboardButton("🔙 Back to Tools", callback_data="help_tools")]]
+
+        if tool == "rename":
+            text = (
+                "**📁 Rename & Tag Media**\n\n"
+                "> The core feature of the bot.\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "**How to Use:**\n"
+                "Simply send any file to the bot. It will automatically scan the name and look up metadata.\n\n"
+                "• **Auto-Detect:** Finds Series, Episode, Year, and Movie Posters.\n"
+                "• **Custom Name:** Bypasses auto-detect for a custom filename.\n"
+                "• **Shortcuts:** `/r` or `/rename`."
+            )
+        elif tool == "audio":
+            text = (
+                "**🎵 Audio Metadata Editor**\n\n"
+                "> Perfect for your music collection.\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "**What it does:**\n"
+                "Allows you to modify the ID3 tags of MP3, FLAC, and other audio files.\n\n"
+                "• You can change the Title, Artist, Album, and embedded Cover Art.\n"
+                "• **Shortcut:** `/a` or `/audio`."
+            )
+        elif tool == "convert":
+            text = (
+                "**🔀 File Converter**\n\n"
+                "> Change formats instantly.\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "**What it does:**\n"
+                "Converts media files from one format to another (e.g., MKV to MP4, WEBM to MP4).\n\n"
+                "• Just send the file and select the format.\n"
+                "• **Shortcut:** `/c` or `/convert`."
+            )
+        elif tool == "watermark":
+            text = (
+                "**© Image Watermarker**\n\n"
+                "> Brand your media.\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "**What it does:**\n"
+                "Adds a custom image watermark (like a logo) to your videos or images.\n\n"
+                "• You can set the position and size.\n"
+                "• **Shortcut:** `/w` or `/watermark`."
+            )
+        elif tool == "subtitle":
+            text = (
+                "**📝 Subtitle Extractor**\n\n"
+                "> Pull subs from MKV files.\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "**What it does:**\n"
+                "Extracts embedded subtitle tracks from video files and gives them to you as `.srt` or `.ass` files.\n\n"
+                "• **No Shortcut yet**, use the Other Features menu."
+            )
+
+        try:
+            await callback_query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(back_to_tools))
+        except MessageNotModified:
+            pass
+
+    elif data == "help_file_management":
+        try:
+            await callback_query.message.edit_text(
+                "**📁 File Management (/myfiles)**\n\n"
+                "> Your personal cloud storage.\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "Use the `/myfiles` command to access your digital storage locker.\n\n"
+                "• **Temporary Files:** Files you have recently processed are saved here temporarily (based on your plan's expiry limits).\n"
+                "• **Permanent Slots:** You can pin important files to keep them forever! (Limit depends on plan).\n"
+                "• **Custom Folders:** Organize your permanent files into categories.",
                 reply_markup=InlineKeyboardMarkup(back_button),
             )
         except MessageNotModified:
             pass
+
     elif data == "help_auto_detect":
         try:
             await callback_query.message.edit_text(
                 "**🤖 Auto-Detect Magic**\n\n"
+                "> Automatic Metadata Lookup.\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
                 "When you send a file directly, my Auto-Detection Matrix scans the filename.\n\n"
                 "• **Series/Movies:** I look for the title, year, season, episode, and quality.\n"
                 "• **Smart Metadata:** If it's a known movie or series, I pull official posters and metadata from TMDb!\n\n"
@@ -495,47 +531,35 @@ async def handle_help_callbacks(client, callback_query):
             )
         except MessageNotModified:
             pass
-    elif data == "help_personal":
-        try:
-            await callback_query.message.edit_text(
-                "**📁 Personal Files & Home Videos**\n\n"
-                "Not just for popular movies! Many users manage their personal home videos, tutorials, or family archives.\n\n"
-                "**How?**\n"
-                "1. Send your personal video.\n"
-                "2. When prompted with TMDb search results, select **'Skip / Manual'** or similar option if it's not a public release.\n"
-                "3. You can still set custom names, add your own thumbnails, and organize them exactly how you want them!",
-                reply_markup=InlineKeyboardMarkup(back_button),
-            )
-        except MessageNotModified:
-            pass
+
     elif data == "help_general":
         try:
             await callback_query.message.edit_text(
-                "**📄 General Mode & Variables**\n\n"
-                "General mode allows you to rename ANY file exactly how you want, bypassing all metadata lookups.\n\n"
-                "**Available Variables for Renaming:**\n"
-                "• `{filename}` - The original filename (without extension)\n"
-                "• `{Season_Episode}` - Example: S01E01 (if detected)\n"
-                "• `{Quality}` - Example: 1080p, 720p (if detected)\n"
-                "• `{Year}` - Example: 2024 (if detected)\n"
-                "• `{Title}` - Example: The Matrix (if detected)\n\n"
-                "*(The file extension like .mkv or .pdf is always added automatically!)*\n\n"
-                "**Shortcuts:**\n"
-                "• `/r` or `/rename` - Start rename flow\n"
-                "• `/p` or `/personal` - Open Personal Files mode directly\n"
-                "• `/g` or `/general` - Open General Mode directly\n"
-                "• `/a` or `/audio` - Open Audio Metadata Editor\n"
-                "• `/c` or `/convert` - Open File Converter\n"
-                "• `/w` or `/watermark` - Open Image Watermarker",
+                "**📄 Personal & General Mode**\n\n"
+                "> Bypass the smart scanners.\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "**📁 Personal Files & Home Videos**\n"
+                "1. Send your personal video.\n"
+                "2. When prompted with TMDb results, select **'Skip / Manual'**.\n"
+                "3. Set custom names and thumbnails for things not on TMDb.\n\n"
+                "**📄 General Mode & Variables**\n"
+                "General mode bypasses metadata completely. Use `/g`.\n"
+                "• `{filename}` - Original filename\n"
+                "• `{Season_Episode}` - Ex: S01E01\n"
+                "• `{Quality}` - Ex: 1080p\n"
+                "• `{Year}`, `{Title}`\n"
+                "*(Extensions are always added automatically)*",
                 reply_markup=InlineKeyboardMarkup(back_button),
             )
         except MessageNotModified:
             pass
+
     elif data == "help_settings":
         if Config.PUBLIC_MODE:
             text = (
                 "**⚙️ Settings & Info**\n\n"
-                "Customize how your files are named and processed.\n\n"
+                "> Customize your experience.\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
                 "• Use the `/settings` command to access your personal settings.\n"
                 "• Configure custom **Filename Templates** (e.g., `{Title} ({Year}) [{Quality}]`).\n"
                 "• Set your own **Default Thumbnail** or disable it.\n"
@@ -545,7 +569,8 @@ async def handle_help_callbacks(client, callback_query):
         else:
             text = (
                 "**⚙️ Settings & Admin**\n\n"
-                "Customize how your files are named and processed.\n\n"
+                "> Customize your experience.\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
                 "• Use the `/admin` command to access advanced settings.\n"
                 "• Configure custom **Filename Templates** (e.g., `{Title} ({Year}) [{Quality}]`).\n"
                 "• Set a **Default Thumbnail** for all your uploads.\n"
