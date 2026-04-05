@@ -515,27 +515,34 @@ class TaskProcessor:
             )
 
         if not self.is_subtitle and self.media_type != "audio":
-            thumb_binary = (
-                self.settings.get("thumbnail_binary") if self.settings else None
-            )
+            thumb_mode = self.settings.get("thumbnail_mode", "none") if self.settings else "none"
 
-            if thumb_binary:
-                def write_thumb():
-                    with open(self.thumb_path, "wb") as f:
-                        f.write(thumb_binary)
-                await asyncio.to_thread(write_thumb)
-            elif self.poster_url:
-                try:
-                    async with aiohttp.ClientSession() as session:
-                        async with session.get(self.poster_url) as resp:
-                            if resp.status == 200:
-                                data = await resp.read()
-                                def write_poster():
-                                    with open(self.thumb_path, "wb") as f:
-                                        f.write(data)
-                                await asyncio.to_thread(write_poster)
-                except Exception as e:
-                    logger.warning(f"Failed to download poster: {e}")
+            if thumb_mode == "none":
+                self.thumb_path = None
+            else:
+                thumb_binary = (
+                    self.settings.get("thumbnail_binary") if self.settings else None
+                )
+
+                if thumb_mode == "custom" and thumb_binary:
+                    def write_thumb():
+                        with open(self.thumb_path, "wb") as f:
+                            f.write(thumb_binary)
+                    await asyncio.to_thread(write_thumb)
+                elif thumb_mode == "auto" and self.poster_url:
+                    try:
+                        async with aiohttp.ClientSession() as session:
+                            async with session.get(self.poster_url) as resp:
+                                if resp.status == 200:
+                                    data = await resp.read()
+                                    def write_poster():
+                                        with open(self.thumb_path, "wb") as f:
+                                            f.write(data)
+                                    await asyncio.to_thread(write_poster)
+                    except Exception as e:
+                        logger.warning(f"Failed to download poster: {e}")
+                else:
+                    self.thumb_path = None
 
         safe_title = re.sub(r'[\\/*?:"<>|,;\'!]', "", self.title)
         safe_title = safe_title.replace("&", "and")

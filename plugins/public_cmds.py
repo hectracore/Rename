@@ -142,7 +142,7 @@ debug("✅ Loaded handler: user_settings_callback")
 
 @Client.on_callback_query(
     filters.regex(
-        r"^(user_|edit_user_template_|edit_user_fn_template_|prompt_user_.*|dumb_user_|set_lang_|set_user_workflow_)"
+        r"^(user_|edit_user_template_|edit_user_fn_template_|prompt_user_.*|dumb_user_|set_lang_|set_user_workflow_|set_thumb_mode_)"
     )
 )
 async def user_settings_callback(client, callback_query):
@@ -290,32 +290,69 @@ async def user_settings_callback(client, callback_query):
         return
 
     if data == "user_thumb_menu":
+        thumb_mode = await db.get_thumbnail_mode(user_id)
+        mode_str = "Deactivated (None)"
+        if thumb_mode == "auto":
+            mode_str = "Auto-detect (Preview)"
+        elif thumb_mode == "custom":
+            mode_str = "Custom Thumbnail"
+
+        text = (
+            "🖼 **Manage Thumbnail Preferences**\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "> **Choose how thumbnails should be handled for your processed files.**\n\n"
+            f"**Current Mode:** `{mode_str}`\n\n"
+            "**Options:**\n"
+            "• **Auto-detect:** Uses the automatic preview image from TMDb.\n"
+            "• **Custom:** Uses your uploaded personal thumbnail.\n"
+            "• **Deactivated:** Skips applying any thumbnail."
+        )
+
+        buttons = [
+            [
+                InlineKeyboardButton(
+                    "✅ Auto-detect" if thumb_mode == "auto" else "Auto-detect",
+                    callback_data="set_thumb_mode_auto"
+                ),
+                InlineKeyboardButton(
+                    "✅ Custom" if thumb_mode == "custom" else "Custom",
+                    callback_data="set_thumb_mode_custom"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "✅ Deactivated (None)" if thumb_mode == "none" else "Deactivated (None)",
+                    callback_data="set_thumb_mode_none"
+                )
+            ]
+        ]
+
+        if thumb_mode == "custom":
+            buttons.append([
+                InlineKeyboardButton("👀 View Custom Thumbnail", callback_data="user_thumb_view")
+            ])
+            buttons.append([
+                InlineKeyboardButton("📤 Upload New Thumbnail", callback_data="user_thumb_set")
+            ])
+
+        buttons.append([InlineKeyboardButton("← Back", callback_data="user_main")])
+
         try:
             await callback_query.message.edit_text(
-                "🖼 **Manage Thumbnail**\n\n" "Select an action:",
-                reply_markup=InlineKeyboardMarkup(
-                    [
-                        [
-                            InlineKeyboardButton(
-                                "👀 View Current", callback_data="user_thumb_view"
-                            )
-                        ],
-                        [
-                            InlineKeyboardButton(
-                                "📤 Set Thumbnail", callback_data="user_thumb_set"
-                            )
-                        ],
-                        [
-                            InlineKeyboardButton(
-                                "🗑 Remove Thumbnail", callback_data="user_thumb_remove"
-                            )
-                        ],
-                        [InlineKeyboardButton("← Back", callback_data="user_main")],
-                    ]
-                ),
+                text,
+                reply_markup=InlineKeyboardMarkup(buttons)
             )
         except MessageNotModified:
             pass
+
+    elif data.startswith("set_thumb_mode_"):
+        new_mode = data.replace("set_thumb_mode_", "")
+        await db.update_thumbnail_mode(new_mode, user_id)
+        await callback_query.answer(f"Thumbnail mode set to {new_mode.capitalize()}!", show_alert=True)
+        callback_query.data = "user_thumb_menu"
+        await user_settings_callback(client, callback_query)
+        return
+
     elif data == "user_thumb_view":
         thumb_bin, _ = await db.get_thumbnail(user_id)
         if thumb_bin:
@@ -396,11 +433,12 @@ async def user_settings_callback(client, callback_query):
             pass
     elif data == "user_thumb_remove":
         await db.update_thumbnail(None, None, user_id)
+        await db.update_thumbnail_mode("none", user_id)
         try:
             await callback_query.message.edit_text(
-                "✅ **Thumbnail Removed**\n\nYour files will no longer use a default custom thumbnail.",
+                "✅ **Thumbnail Removed & Deactivated**\n\nYour files will no longer use a default custom thumbnail and the thumbnail mode has been set to None.",
                 reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton("← Back", callback_data="user_main")]]
+                    [[InlineKeyboardButton("← Back", callback_data="user_thumb_menu")]]
                 ),
             )
         except MessageNotModified:
@@ -558,12 +596,20 @@ async def user_settings_callback(client, callback_query):
     elif data == "user_view":
         settings = await db.get_settings(user_id)
         templates = settings.get("templates", {}) if settings else {}
+        thumb_mode = settings.get("thumbnail_mode", "none") if settings else "none"
         has_thumb = (
             "✅ Yes" if settings and settings.get("thumbnail_binary") else "❌ No"
         )
 
+        mode_str = "Deactivated (None)"
+        if thumb_mode == "auto":
+            mode_str = "Auto-detect (Preview)"
+        elif thumb_mode == "custom":
+            mode_str = "Custom Thumbnail"
+
         text = f"👀 **Your Current Settings**\n\n"
-        text += f"**Thumbnail Set:** {has_thumb}\n\n"
+        text += f"**Thumbnail Mode:** `{mode_str}`\n"
+        text += f"**Custom Thumbnail Set:** {has_thumb}\n\n"
         text += "**Metadata Templates:**\n"
         if templates:
             for k, v in templates.items():
@@ -1004,9 +1050,10 @@ async def handle_user_photo(client, message):
         with open(path, "rb") as f:
             binary_data = f.read()
         await db.update_thumbnail(file_id, binary_data, user_id)
+        await db.update_thumbnail_mode("custom", user_id)
         try:
             await msg.edit_text(
-                "✅ Personal thumbnail updated successfully!",
+                "✅ Personal thumbnail updated successfully!\nYour thumbnail mode has been set to **Custom**.",
                 reply_markup=InlineKeyboardMarkup(
                     [[InlineKeyboardButton("← Back", callback_data="user_thumb_menu")]]
                 ),
