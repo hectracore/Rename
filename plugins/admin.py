@@ -274,7 +274,7 @@ debug("✅ Loaded handler: admin_callback")
 
 @Client.on_callback_query(
     filters.regex(
-        r"^(admin_(?!usage_dashboard|dashboard_|block_|unblock_|reset_quota_|broadcast|users_menu|user_search_start)|edit_template_|edit_fn_template_|prompt_admin_|prompt_public_|prompt_daily_|prompt_global_|prompt_fn_template_|prompt_template_|prompt_premium_|prompt_trial_|dumb_(?!user_)|admin_set_lang_|set_admin_workflow_|admin_pay_|prompt_pay_|set_4gb_access_|admin_prem_cur_|admin_myfiles_|prompt_myfiles_|set_daily_egress_|set_prem_egress_|prompt_prem_egress_custom_|set_admin_thumb_mode_)"
+        r"^(admin_(?!usage_dashboard|dashboard_|block_|unblock_|reset_quota_|broadcast|users_menu|user_search_start)|edit_template_|edit_fn_template_|prompt_admin_|prompt_public_|prompt_daily_|prompt_global_|prompt_fn_template_|prompt_template_|prompt_premium_|prompt_trial_|dumb_(?!user_)|admin_set_lang_|set_admin_workflow_|admin_pay_|prompt_pay_|set_4gb_access_|admin_prem_cur_|admin_myfiles_|prompt_myfiles_|set_daily_egress_|set_prem_egress_|prompt_prem_egress_custom_|set_admin_thumb_mode_|admin_delete_msg)"
     )
 )
 async def admin_callback(client, callback_query):
@@ -1977,36 +1977,41 @@ async def admin_callback(client, callback_query):
             try:
                 f = io.BytesIO(thumb_bin)
                 f.name = "thumbnail.jpg"
-                await client.send_photo(
-                    user_id, f, caption="**Current Default Thumbnail**"
-                )
-                await callback_query.message.edit_text(
-                    "🖼 **Manage Thumbnail**\n\n" "Thumbnail sent above.",
+
+                sent_msg = await client.send_photo(
+                    user_id,
+                    f,
+                    caption="🖼 **Current Default Thumbnail**\n*(This message will auto-delete to keep the chat clean)*",
                     reply_markup=InlineKeyboardMarkup(
-                        [
-                            [
-                                InlineKeyboardButton(
-                                    "👀 View Current", callback_data="admin_thumb_view"
-                                )
-                            ],
-                            [
-                                InlineKeyboardButton(
-                                    "📤 Set Default", callback_data="admin_thumb_set"
-                                )
-                            ],
-                            [
-                                InlineKeyboardButton(
-                                    "🔙 Back", callback_data="admin_main"
-                                )
-                            ],
-                        ]
-                    ),
+                        [[InlineKeyboardButton("✅ OK", callback_data="admin_delete_msg")]]
+                    )
                 )
+
+                import asyncio
+                async def auto_delete():
+                    await asyncio.sleep(30)
+                    try:
+                        await sent_msg.delete()
+                    except Exception:
+                        pass
+
+                asyncio.create_task(auto_delete())
+
+                await callback_query.answer("Thumbnail sent! Check below.", show_alert=False)
+
             except Exception as e:
                 logger.error(f"Failed to send thumbnail: {e}")
                 await callback_query.answer("Error sending thumbnail!", show_alert=True)
         else:
-            await callback_query.answer("No thumbnail set in DB!", show_alert=True)
+            await callback_query.answer("No custom thumbnail currently uploaded!", show_alert=True)
+
+    elif data == "admin_delete_msg":
+        try:
+            await callback_query.message.delete()
+        except Exception:
+            pass
+        return
+
     elif data == "admin_thumb_set":
         try:
             await callback_query.message.edit_text(
