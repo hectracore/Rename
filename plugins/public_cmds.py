@@ -142,7 +142,7 @@ debug("✅ Loaded handler: user_settings_callback")
 
 @Client.on_callback_query(
     filters.regex(
-        r"^(user_|edit_user_template_|edit_user_fn_template_|prompt_user_.*|dumb_user_|set_lang_|set_user_workflow_|set_thumb_mode_)"
+        r"^(user_|edit_user_template_|edit_user_fn_template_|prompt_user_.*|dumb_user_|set_lang_|set_user_workflow_|set_thumb_mode_|user_delete_msg)"
     )
 )
 async def user_settings_callback(client, callback_query):
@@ -362,38 +362,41 @@ async def user_settings_callback(client, callback_query):
             try:
                 f = io.BytesIO(thumb_bin)
                 f.name = "thumbnail.jpg"
-                await client.send_photo(
-                    user_id, f, caption="**Your Current Default Thumbnail**"
-                )
-                await callback_query.message.edit_text(
-                    "🖼 **Manage Thumbnail**\n\n" "Thumbnail sent above.",
+
+                sent_msg = await client.send_photo(
+                    user_id,
+                    f,
+                    caption="🖼 **Your Current Default Thumbnail**\n*(This message will auto-delete to keep the chat clean)*",
                     reply_markup=InlineKeyboardMarkup(
-                        [
-                            [
-                                InlineKeyboardButton(
-                                    "👀 View Current", callback_data="user_thumb_view"
-                                )
-                            ],
-                            [
-                                InlineKeyboardButton(
-                                    "📤 Set Thumbnail", callback_data="user_thumb_set"
-                                )
-                            ],
-                            [
-                                InlineKeyboardButton(
-                                    "🗑 Remove Thumbnail",
-                                    callback_data="user_thumb_remove",
-                                )
-                            ],
-                            [InlineKeyboardButton("← Back", callback_data="user_main")],
-                        ]
-                    ),
+                        [[InlineKeyboardButton("✅ OK", callback_data="user_delete_msg")]]
+                    )
                 )
+
+                import asyncio
+                async def auto_delete():
+                    await asyncio.sleep(30)
+                    try:
+                        await sent_msg.delete()
+                    except Exception:
+                        pass
+
+                asyncio.create_task(auto_delete())
+
+                await callback_query.answer("Thumbnail sent! Check below.", show_alert=False)
+
             except Exception as e:
                 logger.error(f"Failed to send thumbnail: {e}")
                 await callback_query.answer("Error sending thumbnail!", show_alert=True)
         else:
-            await callback_query.answer("No thumbnail set!", show_alert=True)
+            await callback_query.answer("No custom thumbnail currently uploaded!", show_alert=True)
+
+    elif data == "user_delete_msg":
+        try:
+            await callback_query.message.delete()
+        except Exception:
+            pass
+        return
+
     elif data == "user_thumb_set":
         try:
             await callback_query.message.edit_text(
