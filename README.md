@@ -94,6 +94,11 @@ The 𝕏TV MediaStudio™ features a highly robust, business-class **Premium Sub
 </details>
 
 <details>
+<summary>📈 <b>Unified Limit Management</b></summary>
+Admins can easily set Free, Standard, and Deluxe plan limits (daily files, egress limits, custom folders, etc.) from a single unified menu under "Access & Limits".
+</details>
+
+<details>
 <summary><b>💳 High-End Payment Gateways</b></summary>
 <br>
 

@@ -38,6 +38,9 @@ def get_admin_main_menu(pro_session, public_mode):
                 InlineKeyboardButton(
                     "💳 Manage Payments", callback_data="admin_payments_menu"
                 ),
+                InlineKeyboardButton(
+                    "📢 Force-Sub Settings", callback_data="admin_force_sub_menu"
+                ),
             ]
         )
         keyboard.append(
@@ -137,16 +140,16 @@ def get_admin_templates_menu():
     )
 
 async def get_admin_access_limits_menu():
+    buttons = [
+        [InlineKeyboardButton("🔑 Access", callback_data="admin_access_menu"),
+         InlineKeyboardButton("📈 Limits", callback_data="admin_limits_menu")],
+        [InlineKeyboardButton("← Back to Admin Panel", callback_data="admin_main")]
+    ]
+    return InlineKeyboardMarkup(buttons)
+
+async def get_admin_access_menu():
     buttons = []
     if Config.PUBLIC_MODE:
-        buttons.append(
-            [
-                InlineKeyboardButton(
-                    "📢 Force-Sub Settings", callback_data="admin_force_sub_menu"
-                )
-            ]
-        )
-
         pro_session = await db.get_pro_session()
         if pro_session:
             buttons.append(
@@ -156,37 +159,6 @@ async def get_admin_access_limits_menu():
                     )
                 ]
             )
-
-        buttons.append(
-            [
-                InlineKeyboardButton(
-                    "📄 Set Daily Per-User File Limit", callback_data="admin_daily_files"
-                )
-            ]
-        )
-        buttons.append(
-            [
-                InlineKeyboardButton(
-                    "💎 Premium Settings", callback_data="admin_premium_settings"
-                )
-            ]
-        )
-
-    buttons.append(
-        [
-            InlineKeyboardButton(
-                "🌍 Set Global Daily Egress Limit", callback_data="admin_global_daily_egress"
-            )
-        ]
-    )
-    if Config.PUBLIC_MODE:
-        buttons.append(
-            [
-                InlineKeyboardButton(
-                    "📁 Per-User /myfiles Settings", callback_data="admin_myfiles_settings"
-                )
-            ]
-        )
     buttons.append(
         [
             InlineKeyboardButton(
@@ -194,7 +166,43 @@ async def get_admin_access_limits_menu():
             )
         ]
     )
-    buttons.append([InlineKeyboardButton("← Back to Admin Panel", callback_data="admin_main")])
+    buttons.append([InlineKeyboardButton("← Back", callback_data="admin_access_limits")])
+    return InlineKeyboardMarkup(buttons)
+
+async def get_admin_limits_menu():
+    buttons = []
+    if Config.PUBLIC_MODE:
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    "💎 Premium Settings", callback_data="admin_premium_settings"
+                )
+            ]
+        )
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    "⚙️ Per Plan Limits", callback_data="admin_per_plan_limits"
+                )
+            ]
+        )
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    "📁 Per-User /myfiles Settings", callback_data="admin_myfiles_settings"
+                )
+            ]
+        )
+    else:
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    "🌍 Set Global Daily Egress Limit", callback_data="admin_global_daily_egress"
+                )
+            ]
+        )
+
+    buttons.append([InlineKeyboardButton("← Back", callback_data="admin_access_limits")])
     return InlineKeyboardMarkup(buttons)
 
 def get_admin_public_settings_menu():
@@ -281,9 +289,9 @@ async def admin_callback(client, callback_query):
         text = "📁 **/myfiles Settings**\n\nConfigure database channels, storage limits, and cleanup unused files."
         buttons = [
             [InlineKeyboardButton("🗄️ Database Channels", callback_data="admin_myfiles_db_channels")],
-            [InlineKeyboardButton("⚙️ Per-Plan Limits", callback_data="admin_myfiles_limits")],
+            [InlineKeyboardButton("⚙️ Per-Plan Limits", callback_data="admin_per_plan_limits")],
             [InlineKeyboardButton("🧹 DB Cleanup Tools", callback_data="admin_myfiles_cleanup")],
-            [InlineKeyboardButton("← Back", callback_data="admin_access_limits" if Config.PUBLIC_MODE else "admin_main")]
+            [InlineKeyboardButton("← Back", callback_data="admin_limits_menu" if Config.PUBLIC_MODE else "admin_main")]
         ]
         try:
             await callback_query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons))
@@ -342,85 +350,94 @@ async def admin_callback(client, callback_query):
             )
         except MessageNotModified:
             pass
-        return
+    elif data == "admin_per_plan_limits":
+        config = await db.get_public_config()
 
-    if data == "admin_myfiles_limits":
-        config = await db.get_public_config() if Config.PUBLIC_MODE else await db.settings.find_one({"_id": "global_settings"})
         limits = config.get("myfiles_limits", {})
+        free_lm = limits.get("free", {})
+        std_lm = limits.get("standard", {})
+        dlx_lm = limits.get("deluxe", {})
 
         def f(v): return "Unlimited" if v == -1 else v
 
-        if Config.PUBLIC_MODE:
-            free = limits.get("free", {})
-            std = limits.get("standard", {})
-            dlx = limits.get("deluxe", {})
+        # Free limits
+        free_egress = config.get("daily_egress_mb", 0)
+        free_files = config.get("daily_file_count", 0)
 
-            text = (
-                "⚙️ **/myfiles Storage Limits**\n\n"
-                "> Manage cloud storage quotas per tier.\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "🆓 **Free Plan**\n"
-                f"📌 Permanent Slots : `{f(free.get('permanent_limit'))}`\n"
-                f"📁 Custom Folders  : `{f(free.get('folder_limit'))}`\n"
-                f"⏳ Temp Expiration : `{f(free.get('expiry_days'))} days`\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "🌟 **Standard Plan**\n"
-                f"📌 Permanent Slots : `{f(std.get('permanent_limit'))}`\n"
-                f"📁 Custom Folders  : `{f(std.get('folder_limit'))}`\n"
-                f"⏳ Temp Expiration : `{f(std.get('expiry_days'))} days`\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "💎 **Deluxe Plan**\n"
-                f"📌 Permanent Slots : `{f(dlx.get('permanent_limit'))}`\n"
-                f"📁 Custom Folders  : `{f(dlx.get('folder_limit'))}`\n"
-                f"⏳ Temp Expiration : `{f(dlx.get('expiry_days'))} days`\n"
-                "━━━━━━━━━━━━━━━━━━━━"
-            )
-            buttons = [
-                [InlineKeyboardButton("✏️ Edit Free", callback_data="admin_myfiles_edit_limits_free"),
-                 InlineKeyboardButton("✏️ Edit Standard", callback_data="admin_myfiles_edit_limits_standard")],
-                [InlineKeyboardButton("✏️ Edit Deluxe", callback_data="admin_myfiles_edit_limits_deluxe")],
-                [InlineKeyboardButton("← Back", callback_data="admin_myfiles_settings")]
-            ]
-        else:
-            global_limits = limits.get("global", {})
-            text = (
-                "⚙️ **Global Storage Limits**\n\n"
-                "> Manage Team Drive storage quotas.\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "🌍 **All Users (Team Drive)**\n"
-                f"📌 Permanent Slots : `{f(global_limits.get('permanent_limit', -1))}`\n"
-                f"📁 Custom Folders  : `{f(global_limits.get('folder_limit', -1))}`\n"
-                f"⏳ Temp Expiration : `{f(global_limits.get('expiry_days', -1))} days`\n"
-                "━━━━━━━━━━━━━━━━━━━━"
-            )
-            buttons = [
-                [InlineKeyboardButton("✏️ Edit Global Limits", callback_data="admin_myfiles_edit_limits_global")],
-                [InlineKeyboardButton("← Back", callback_data="admin_myfiles_settings")]
-            ]
+        # Premium limits
+        std_settings = config.get("premium_standard", {})
+        dlx_settings = config.get("premium_deluxe", {})
 
-        try:
-            await callback_query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons))
-        except MessageNotModified:
-            pass
-        return
+        std_egress = std_settings.get("daily_egress_mb", 0)
+        std_files = std_settings.get("daily_file_count", 0)
 
-    if data.startswith("admin_myfiles_edit_limits_"):
-        plan = data.replace("admin_myfiles_edit_limits_", "")
+        dlx_egress = dlx_settings.get("daily_egress_mb", 0)
+        dlx_files = dlx_settings.get("daily_file_count", 0)
+
         text = (
-            f"⚙️ **Edit {plan.capitalize()} Storage Limits**\n\n"
-            f"Select which specific quota you want to modify for this tier:"
+            "⚙️ **Per Plan Limit**\n\n"
+            "> Overview of all tier limitations.\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🆓 **Free Plan**\n"
+            f"📌 Permanent Slots : `{f(free_lm.get('permanent_limit', 0))}`\n"
+            f"📁 Custom Folders  : `{f(free_lm.get('folder_limit', 0))}`\n"
+            f"⏳ Temp Expiration : `{f(free_lm.get('expiry_days', 0))} days`\n"
+            f"📦 Daily Egress: `{f(free_egress)}` MB\n"
+            f"📄 Daily Files: `{f(free_files)}` files\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🌟 **Standard Plan**\n"
+            f"📌 Permanent Slots : `{f(std_lm.get('permanent_limit', 0))}`\n"
+            f"📁 Custom Folders  : `{f(std_lm.get('folder_limit', 0))}`\n"
+            f"⏳ Temp Expiration : `{f(std_lm.get('expiry_days', 0))} days`\n"
+            f"📦 Daily Egress: `{f(std_egress)}` MB\n"
+            f"📄 Daily Files: `{f(std_files)}` files\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💎 **Deluxe Plan**\n"
+            f"📌 Permanent Slots : `{f(dlx_lm.get('permanent_limit', 0))}`\n"
+            f"📁 Custom Folders  : `{f(dlx_lm.get('folder_limit', 0))}`\n"
+            f"⏳ Temp Expiration : `{f(dlx_lm.get('expiry_days', 0))} days`\n"
+            f"📦 Daily Egress: `{f(dlx_egress)}` MB\n"
+            f"📄 Daily Files: `{f(dlx_files)}` files\n"
+            "━━━━━━━━━━━━━━━━━━━━"
         )
+
         buttons = [
-            [InlineKeyboardButton("📌 Edit Permanent Limit", callback_data=f"prompt_myfiles_lim_{plan}_permanent")],
-            [InlineKeyboardButton("📁 Edit Folder Limit", callback_data=f"prompt_myfiles_lim_{plan}_folder")],
-            [InlineKeyboardButton("⏳ Edit Expiry Days", callback_data=f"prompt_myfiles_lim_{plan}_expiry")],
-            [InlineKeyboardButton("← Back", callback_data="admin_myfiles_limits")]
+            [InlineKeyboardButton("✏️ Edit Free Plan", callback_data="admin_edit_plan_free")],
+            [InlineKeyboardButton("✏️ Edit Standard Plan", callback_data="admin_edit_plan_standard")],
+            [InlineKeyboardButton("✏️ Edit Deluxe Plan", callback_data="admin_edit_plan_deluxe")],
+            [InlineKeyboardButton("← Back", callback_data="admin_limits_menu")]
         ]
+
+        try:
+            await callback_query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+        except MessageNotModified:
+            pass
+    elif data.startswith("admin_edit_plan_"):
+        plan_name = data.replace("admin_edit_plan_", "")
+
+        buttons = [
+            [InlineKeyboardButton("📌 Edit Permanent Limit", callback_data=f"prompt_myfiles_lim_{plan_name}_permanent")],
+            [InlineKeyboardButton("📁 Edit Folder Limit", callback_data=f"prompt_myfiles_lim_{plan_name}_folder")],
+            [InlineKeyboardButton("⏳ Edit Expiry Days", callback_data=f"prompt_myfiles_lim_{plan_name}_expiry")]
+        ]
+
+        if plan_name == "free":
+            buttons.append([InlineKeyboardButton("📦 Edit Egress Limit", callback_data="admin_daily_egress")])
+            buttons.append([InlineKeyboardButton("📄 Edit File Limit", callback_data="admin_daily_files")])
+        else:
+            buttons.append([InlineKeyboardButton("📦 Edit Egress Limit", callback_data=f"prompt_premium_{plan_name}_egress")])
+            buttons.append([InlineKeyboardButton("📄 Edit File Limit", callback_data=f"prompt_premium_{plan_name}_files")])
+
+        buttons.append([InlineKeyboardButton("← Back", callback_data="admin_per_plan_limits")])
+
+        text = f"⚙️ **Edit {plan_name.capitalize()} Plan Limits**\n\nSelect a limit to modify:"
+
         try:
             await callback_query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons))
         except MessageNotModified:
             pass
         return
+
 
     if data.startswith("prompt_myfiles_lim_"):
         parts = data.replace("prompt_myfiles_lim_", "").split("_")
@@ -441,7 +458,7 @@ async def admin_callback(client, callback_query):
                 f"For the **{plan.capitalize()}** Tier.\n\n"
                 f"Please send a number in the chat (e.g. `50` or `30`).\n"
                 f"> 💡 *Tip: Send `-1` to set this limit to UNLIMITED.*",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"admin_myfiles_edit_limits_{plan}")]])
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"admin_edit_plan_{plan}")]])
             )
         except MessageNotModified:
             pass
@@ -968,16 +985,11 @@ async def admin_callback(client, callback_query):
             plan_key = f"premium_{plan_name}"
             plan_settings = config.get(plan_key, {})
 
-            egress = plan_settings.get("daily_egress_mb", 0)
-            files = plan_settings.get("daily_file_count", 0)
             price = plan_settings.get("price_string", "0 USD")
             stars_price = plan_settings.get("stars_price", 0)
 
             text = (
                 f"💎 **{plan_name.capitalize()} Plan Settings**\n\n"
-                f"📦 Daily Egress: `{egress}` MB\n"
-                f"📄 Daily Files: `{files}` files\n"
-                f"*(0 means unlimited)*\n\n"
                 f"💵 Price (Fiat): `{price}`\n"
                 f"⭐ Price (Stars): `{stars_price}` Stars\n\n"
                 "Select a setting to edit:"
@@ -987,10 +999,6 @@ async def admin_callback(client, callback_query):
                 await callback_query.message.edit_text(
                     text,
                     reply_markup=InlineKeyboardMarkup([
-                        [
-                            InlineKeyboardButton("📦 Edit Egress Limit", callback_data=f"prompt_premium_{plan_name}_egress"),
-                            InlineKeyboardButton("📄 Edit File Limit", callback_data=f"prompt_premium_{plan_name}_files")
-                        ],
                         [
                             InlineKeyboardButton("💵 Edit Fiat Price", callback_data=f"prompt_premium_{plan_name}_price"),
                             InlineKeyboardButton("⭐ Edit Stars Price", callback_data=f"prompt_premium_{plan_name}_stars")
@@ -1075,6 +1083,38 @@ async def admin_callback(client, callback_query):
                 plan_name = parts[0]
                 field = parts[1]
 
+                if field == "egress":
+                    try:
+                        await callback_query.message.edit_text(
+                            f"📦 **Edit Daily Egress Limit** ({plan_name.capitalize()} Plan)\n\n"
+                            f"Select a predefined size or click **Change Custom** to enter a value manually (e.g. `20 GB` or `512 MB`):",
+                            reply_markup=InlineKeyboardMarkup(
+                                [
+                                    [
+                                        InlineKeyboardButton("512 MB", callback_data=f"set_prem_egress_{plan_name}_512"),
+                                        InlineKeyboardButton("1 GB", callback_data=f"set_prem_egress_{plan_name}_1024")
+                                    ],
+                                    [
+                                        InlineKeyboardButton("2 GB", callback_data=f"set_prem_egress_{plan_name}_2048"),
+                                        InlineKeyboardButton("4 GB", callback_data=f"set_prem_egress_{plan_name}_4096")
+                                    ],
+                                    [
+                                        InlineKeyboardButton(
+                                            "✏️ Change Custom", callback_data=f"prompt_prem_egress_custom_{plan_name}"
+                                        )
+                                    ],
+                                    [
+                                        InlineKeyboardButton(
+                                            "← Back", callback_data=f"admin_edit_plan_{plan_name}"
+                                        )
+                                    ],
+                                ]
+                            ),
+                        )
+                    except MessageNotModified:
+                        pass
+                    return
+
                 if field == "price":
                     try:
                         await callback_query.message.edit_text(
@@ -1096,7 +1136,6 @@ async def admin_callback(client, callback_query):
                 admin_sessions[user_id] = f"awaiting_premium_{plan_name}_{field}"
 
                 prompts = {
-                    "egress": "📦 **Send the new daily egress limit in MB (e.g., 2048).**\nSend `0` to disable.",
                     "files": "📄 **Send the new daily file limit.**\nSend `0` to disable.",
                 }
 
@@ -1116,14 +1155,49 @@ async def admin_callback(client, callback_query):
 
                     prompts["stars"] = star_prompt
 
+                # Dynamic cancel target depending on the field being edited
+                if field in ["egress", "files"]:
+                    cancel_cb = f"admin_edit_plan_{plan_name}"
+                else:
+                    cancel_cb = f"admin_premium_plan_{plan_name}"
+
                 try:
                     await callback_query.message.edit_text(
                         prompts.get(field, "Enter new value:"),
-                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"admin_premium_plan_{plan_name}")]])
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=cancel_cb)]])
                     )
                 except MessageNotModified:
                     pass
                 return
+
+    if data.startswith("prompt_prem_egress_custom_"):
+        plan_name = data.replace("prompt_prem_egress_custom_", "")
+        admin_sessions[user_id] = f"awaiting_premium_{plan_name}_egress"
+        try:
+            await callback_query.message.edit_text(
+                "📦 **Send the new daily egress limit.**\n\nYou can send the value in MB (e.g., `2048`) or use `GB` format (e.g., `2 GB` or `5.5 GB`).\nSend `0` to disable.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"admin_edit_plan_{plan_name}")]])
+            )
+        except MessageNotModified:
+            pass
+        return
+
+    if data.startswith("set_prem_egress_"):
+        parts = data.replace("set_prem_egress_", "").split("_")
+        if len(parts) >= 2:
+            plan_name = parts[0]
+            val = int(parts[1])
+
+            config = await db.get_public_config()
+            plan_key = f"premium_{plan_name}"
+            plan_settings = config.get(plan_key, {})
+            plan_settings["daily_egress_mb"] = val
+            await db.update_public_config(plan_key, plan_settings)
+
+            await callback_query.answer(f"{plan_name.capitalize()} Egress limit updated to {val} MB.", show_alert=True)
+            callback_query.data = f"admin_edit_plan_{plan_name}"
+            await admin_callback(client, callback_query)
+        return
 
     if data.startswith("admin_prem_cur_"):
         parts = data.replace("admin_prem_cur_", "").split("_")
@@ -1659,17 +1733,27 @@ async def admin_callback(client, callback_query):
             current_val = config.get("daily_egress_mb", 0)
             try:
                 await callback_query.message.edit_text(
-                    f"📦 **Edit Daily Egress Limit**\n\nCurrent: `{current_val}` MB\n\nClick below to change it.",
+                    f"📦 **Edit Daily Egress Limit** (Free Plan)\n\n"
+                    f"Current: `{current_val}` MB\n\n"
+                    f"Select a predefined size or click **Change Custom** to enter a value manually (e.g. `20 GB` or `512 MB`):",
                     reply_markup=InlineKeyboardMarkup(
                         [
                             [
+                                InlineKeyboardButton("512 MB", callback_data="set_daily_egress_512"),
+                                InlineKeyboardButton("1 GB", callback_data="set_daily_egress_1024")
+                            ],
+                            [
+                                InlineKeyboardButton("2 GB", callback_data="set_daily_egress_2048"),
+                                InlineKeyboardButton("4 GB", callback_data="set_daily_egress_4096")
+                            ],
+                            [
                                 InlineKeyboardButton(
-                                    "✏️ Change", callback_data="prompt_daily_egress"
+                                    "✏️ Change Custom", callback_data="prompt_daily_egress"
                                 )
                             ],
                             [
                                 InlineKeyboardButton(
-                                    "← Back", callback_data="admin_access_limits"
+                                    "← Back", callback_data="admin_edit_plan_free"
                                 )
                             ],
                         ]
@@ -1679,12 +1763,20 @@ async def admin_callback(client, callback_query):
                 pass
             return
 
+        elif data.startswith("set_daily_egress_"):
+            val = int(data.replace("set_daily_egress_", ""))
+            await db.update_public_config("daily_egress_mb", val)
+            await callback_query.answer(f"Egress limit updated to {val} MB.", show_alert=True)
+            callback_query.data = "admin_edit_plan_free"
+            await admin_callback(client, callback_query)
+            return
+
         elif data == "admin_daily_files":
             config = await db.get_public_config()
             current_val = config.get("daily_file_count", 0)
             try:
                 await callback_query.message.edit_text(
-                    f"📄 **Edit Daily File Limit**\n\nCurrent: `{current_val}` files\n\nClick below to change it.",
+                    f"📄 **Edit Daily File Limit** (Free Plan)\n\nCurrent: `{current_val}` files\n\nClick below to change it.",
                     reply_markup=InlineKeyboardMarkup(
                         [
                             [
@@ -1694,7 +1786,7 @@ async def admin_callback(client, callback_query):
                             ],
                             [
                                 InlineKeyboardButton(
-                                    "← Back", callback_data="admin_access_limits"
+                                    "← Back", callback_data="admin_edit_plan_free"
                                 )
                             ],
                         ]
@@ -1726,11 +1818,14 @@ async def admin_callback(client, callback_query):
                 "*Send /cancel to cancel.*"
             )
         elif field == "daily_egress":
-            text = "📦 **Send the new daily egress limit in MB (e.g., 2048).**\nSend `0` to disable."
+            text = "📦 **Send the new daily egress limit.**\n\nYou can send the value in MB (e.g., `2048`) or use `GB` format (e.g., `2 GB` or `5.5 GB`).\nSend `0` to disable."
+            cancel_btn = "admin_edit_plan_free"
         elif field == "daily_files":
             text = "📄 **Send the new daily file limit.**\nSend `0` to disable."
+            cancel_btn = "admin_edit_plan_free"
         else:
             text = "Send the new value:"
+            cancel_btn = "admin_public_settings"
 
         try:
             await callback_query.message.edit_text(
@@ -1739,7 +1834,7 @@ async def admin_callback(client, callback_query):
                     [
                         [
                             InlineKeyboardButton(
-                                "❌ Cancel", callback_data="admin_public_settings"
+                                "❌ Cancel", callback_data=cancel_btn
                             )
                         ]
                     ]
@@ -1862,7 +1957,25 @@ async def admin_callback(client, callback_query):
         try:
             reply_markup = await get_admin_access_limits_menu()
             await callback_query.message.edit_text(
-                "🔒 **Access & Limits Menu**\n\n" "Select a setting to edit:",
+                "🔒 **Access & Limits Menu**\n\n" "Select a category:",
+                reply_markup=reply_markup,
+            )
+        except MessageNotModified:
+            pass
+    elif data == "admin_access_menu":
+        try:
+            reply_markup = await get_admin_access_menu()
+            await callback_query.message.edit_text(
+                "🔑 **Access Settings**\n\n" "Manage global access and toggles:",
+                reply_markup=reply_markup,
+            )
+        except MessageNotModified:
+            pass
+    elif data == "admin_limits_menu":
+        try:
+            reply_markup = await get_admin_limits_menu()
+            await callback_query.message.edit_text(
+                "📈 **Limits Settings**\n\n" "Manage user quotas and file limits:",
                 reply_markup=reply_markup,
             )
         except MessageNotModified:
@@ -2588,7 +2701,7 @@ async def handle_admin_text(client, message):
 
         await message.reply_text(
             f"✅ {plan.capitalize()} {field} limit updated to `{val_int}`.",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("← Back", callback_data=f"admin_myfiles_edit_limits_{plan}")]])
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("← Back", callback_data=f"admin_edit_plan_{plan}")]])
         )
         admin_sessions.pop(user_id, None)
         raise StopPropagation
@@ -2898,7 +3011,7 @@ async def handle_admin_text(client, message):
                         [
                             [
                                 InlineKeyboardButton(
-                                    "❌ Cancel", callback_data="admin_main"
+                                    "❌ Cancel", callback_data="admin_edit_plan_free"
                                 )
                             ]
                         ]
@@ -2919,28 +3032,37 @@ async def handle_admin_text(client, message):
                 ),
             )
         elif field == "daily_egress":
-            if not val.isdigit():
-                await message.reply_text(
-                    "❌ Invalid number. Try again.",
-                    reply_markup=InlineKeyboardMarkup(
-                        [
-                            [
-                                InlineKeyboardButton(
-                                    "❌ Cancel", callback_data="admin_main"
-                                )
-                            ]
-                        ]
-                    ),
-                )
-                return
-            await db.update_public_config("daily_egress_mb", int(val))
+            val_lower = val.lower().strip()
+            val_num = 0
+
+            if "gb" in val_lower:
+                try:
+                    gb_val = float(val_lower.replace("gb", "").strip())
+                    val_num = int(gb_val * 1024)
+                except ValueError:
+                    await message.reply_text(
+                        "❌ Invalid GB format. Please use something like `2 GB`.",
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="admin_edit_plan_free")]])
+                    )
+                    return
+            else:
+                try:
+                    val_num = int(float(val_lower.replace("mb", "").strip()))
+                except ValueError:
+                    await message.reply_text(
+                        "❌ Invalid number format. Try again.",
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="admin_edit_plan_free")]])
+                    )
+                    return
+
+            await db.update_public_config("daily_egress_mb", val_num)
             await message.reply_text(
-                f"✅ Daily egress limit updated to `{val}` MB.",
+                f"✅ Free plan egress limit updated to `{val_num}` MB.",
                 reply_markup=InlineKeyboardMarkup(
                     [
                         [
                             InlineKeyboardButton(
-                                "🔙 Back to Menu", callback_data="admin_main"
+                                "🔙 Back to Free Plan Limits", callback_data="admin_edit_plan_free"
                             )
                         ]
                     ]
@@ -2963,12 +3085,12 @@ async def handle_admin_text(client, message):
                 return
             await db.update_public_config("daily_file_count", int(val))
             await message.reply_text(
-                f"✅ Daily files limit updated to `{val}` files.",
+                f"✅ Free plan files limit updated to `{val}` files.",
                 reply_markup=InlineKeyboardMarkup(
                     [
                         [
                             InlineKeyboardButton(
-                                "🔙 Back to Menu", callback_data="admin_main"
+                                "🔙 Back to Free Plan Limits", callback_data="admin_edit_plan_free"
                             )
                         ]
                     ]
@@ -2998,17 +3120,40 @@ async def handle_admin_text(client, message):
                     return
                 val_num = int(val)
                 if field == "egress":
+                    val_lower = val.lower().strip()
+                    if "gb" in val_lower:
+                        try:
+                            gb_val = float(val_lower.replace("gb", "").strip())
+                            val_num = int(gb_val * 1024)
+                        except ValueError:
+                            await message.reply_text(
+                                "❌ Invalid GB format. Please use something like `2 GB`.",
+                                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"admin_edit_plan_{plan_name}")]])
+                            )
+                            return
+                    else:
+                        try:
+                            val_num = int(float(val_lower.replace("mb", "").strip()))
+                        except ValueError:
+                            await message.reply_text(
+                                "❌ Invalid number format. Try again.",
+                                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"admin_edit_plan_{plan_name}")]])
+                            )
+                            return
+
                     plan_settings["daily_egress_mb"] = val_num
                 elif field == "files":
-                    plan_settings["daily_file_count"] = val_num
+                    plan_settings["daily_file_count"] = int(val)
                 elif field == "stars":
                     plan_settings["stars_price"] = val_num
 
             await db.update_public_config(plan_key, plan_settings)
 
+            back_btn_cb = f"admin_edit_plan_{plan_name}" if field in ["egress", "files"] else f"admin_premium_plan_{plan_name}"
+
             await message.reply_text(
-                f"✅ {plan_name.capitalize()} {field} updated to `{val}`.",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("← Back", callback_data=f"admin_premium_plan_{plan_name}")]])
+                f"✅ {plan_name.capitalize()} {field} updated to `{val_num}`.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("← Back", callback_data=back_btn_cb)]])
             )
             admin_sessions.pop(user_id, None)
             return
