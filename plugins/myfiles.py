@@ -452,6 +452,7 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
         )
         buttons = [
             [InlineKeyboardButton(f"Auto-Permanent: {emoji}", callback_data="myfiles_toggle_auto")],
+            [InlineKeyboardButton("🔒 Privacy Settings", callback_data="myfiles_privacy_settings")],
             [InlineKeyboardButton("🗑️ Clear Permanent Storage", callback_data="myfiles_clear_perm")],
             [InlineKeyboardButton("🔙 Back", callback_data="myfiles_main")]
         ]
@@ -459,6 +460,39 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
             await callback_query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons))
         except MessageNotModified:
             pass
+        return
+
+    if data == "myfiles_privacy_settings":
+        user_settings = await db.get_settings(user_id)
+        share_name = True
+        if user_settings and "share_display_name" in user_settings:
+            share_name = user_settings["share_display_name"]
+
+        emoji = "✅ ON" if share_name else "❌ OFF"
+        text = (
+            "🔒 **Privacy Settings**\n\n"
+            "**Share Display Name:** When enabled, your name will be displayed when sharing your files with others via deep links."
+        )
+        buttons = [
+            [InlineKeyboardButton(f"Display Name on Shares: {emoji}", callback_data="myfiles_toggle_share_name")],
+            [InlineKeyboardButton("🔙 Back", callback_data="myfiles_settings")]
+        ]
+        try:
+            await callback_query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+        except MessageNotModified:
+            pass
+        return
+
+    if data == "myfiles_toggle_share_name":
+        user_settings = await db.get_settings(user_id)
+        share_name = True
+        if user_settings and "share_display_name" in user_settings:
+            share_name = user_settings["share_display_name"]
+
+        await db.settings.update_one({"_id": db._get_doc_id(user_id)}, {"$set": {"share_display_name": not share_name}}, upsert=True)
+        await callback_query.answer("Privacy setting updated", show_alert=False)
+        callback_query.data = "myfiles_privacy_settings"
+        await myfiles_callback(client, callback_query)
         return
 
     if data == "myfiles_toggle_auto":

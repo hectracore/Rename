@@ -42,12 +42,48 @@ async def handle_start_command_unique(client, message):
                             await send_force_sub_gate(client, message, config)
                             raise StopPropagation
 
+                    owner_id = f.get("user_id")
+                    owner_name = "A user"
+                    is_owner_premium = False
+                    share_display_name = True
+
+                    if owner_id:
+                        owner_doc = await db.get_user(owner_id)
+                        if owner_doc:
+                            is_owner_premium = owner_doc.get("is_premium", False)
+                            owner_name = owner_doc.get("first_name", "A user")
+
+                        owner_settings = await db.get_settings(owner_id)
+                        if owner_settings and "share_display_name" in owner_settings:
+                            share_display_name = owner_settings["share_display_name"]
+
+                    if share_display_name and owner_name != "A user":
+                        share_text = f"> **{owner_name}** has shared this file with you."
+                    else:
+                        share_text = "> A file has been shared with you."
+
+                    await message.reply_text(f"📁 **File Received**\n\n{share_text}")
+
                     await client.copy_message(
                         chat_id=user_id,
                         from_chat_id=f["channel_id"],
                         message_id=f["message_id"]
                     )
                     await client.send_sticker(chat_id=user_id, sticker="CAACAgIAAxkBAAEQa0xpgkMvycmQypya3zZxS5rU8tuKBQACwJ0AAjP9EEgYhDgLPnTykDgE")
+
+                    if not is_owner_premium:
+                        ad_text = (
+                            "> **Rename. Convert. Organize.**\n"
+                            "> Process your own media with 𝕏TV MediaStudio™ today!"
+                        )
+                        from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+                        await message.reply_text(
+                            ad_text,
+                            reply_markup=InlineKeyboardMarkup(
+                                [[InlineKeyboardButton("🚀 Start Processing", callback_data="start_renaming")]]
+                            )
+                        )
+
                     raise StopPropagation
                 else:
                     await message.reply_text("❌ File not found.")
