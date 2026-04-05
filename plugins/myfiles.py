@@ -39,7 +39,7 @@ async def get_myfiles_main_menu(user_id: int):
         limit_str = str(perm_limit) if perm_limit != -1 else "Unlimited"
 
         text = (
-            "📁 **My Files Management [v2.0]**\n\n"
+            "📁 **My Files Management**\n\n"
             f"**Plan:** `{plan.capitalize()}`\n"
             f"**Permanent Storage:** `{perm_count} / {limit_str}` files\n"
             f"**Temporary Storage:** `{temp_count}` files\n\n"
@@ -55,7 +55,7 @@ async def get_myfiles_main_menu(user_id: int):
         limit_str = str(perm_limit) if perm_limit != -1 else "Unlimited"
 
         text = (
-            "📁 **Team Files Management [v2.0]**\n\n"
+            "📁 **Team Files Management**\n\n"
             f"**Permanent Storage:** `{perm_count} / {limit_str}` files\n"
             f"**Temporary Storage:** `{temp_count}` files\n\n"
             "Select a category to view files:"
