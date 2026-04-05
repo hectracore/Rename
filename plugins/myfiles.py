@@ -216,7 +216,7 @@ async def myfiles_text_handler(client: Client, message: Message):
         await set_myfiles_state(user_id, {})
 
         # Stop propagation to prevent flow.py from processing this text
-        from pyrogram.errors import StopPropagation
+        from pyrogram import StopPropagation
         raise StopPropagation
 
     if state.startswith("awaiting_rename_"):
@@ -228,7 +228,7 @@ async def myfiles_text_handler(client: Client, message: Message):
         await message.reply_text(f"✅ File renamed to `{new_name}`.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to File", callback_data=f"myfiles_file_{file_id}")]]))
         await set_myfiles_state(user_id, {})
 
-        from pyrogram.errors import StopPropagation
+        from pyrogram import StopPropagation
         raise StopPropagation
 
     from pyrogram import ContinuePropagation
@@ -338,7 +338,6 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
             await callback_query.answer("No files selected.", show_alert=True)
             return
 
-        from bson.objectid import ObjectId
         object_ids = [ObjectId(fid) for fid in selected_files]
 
         await db.files.delete_many({"_id": {"$in": object_ids}})
@@ -392,7 +391,6 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
             await callback_query.answer("No files selected.", show_alert=True)
             return
 
-        from bson.objectid import ObjectId
         object_ids = [ObjectId(fid) for fid in selected_files]
 
         if folder_id == "None":
