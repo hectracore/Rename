@@ -1,5 +1,6 @@
 # --- Imports ---
 from pyrogram import Client, filters
+from pyrogram.errors import MessageNotModified
 from pyrogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from config import Config
 from database import db
@@ -118,8 +119,8 @@ async def build_files_list_keyboard(user_id: int, filter_query: dict, page: int,
     ms_label = "✅ Multi-Select: ON" if multi_select else "☑️ Multi-Select: OFF"
 
     buttons.append([
-        InlineKeyboardButton(sort_label, callback_data=f"myfiles_sort_toggle_{back_data}"),
-        InlineKeyboardButton(ms_label, callback_data=f"myfiles_ms_toggle_{back_data}")
+        InlineKeyboardButton(sort_label, callback_data=f"mf_st_{back_data}"),
+        InlineKeyboardButton(ms_label, callback_data=f"mf_ms_{back_data}")
     ])
 
     for f in files:
@@ -131,7 +132,7 @@ async def build_files_list_keyboard(user_id: int, filter_query: dict, page: int,
         if multi_select:
             prefix = "🔘 " if f_id_str in selected_files else "⚪️ "
             btn_text = f"{prefix}{name}"
-            callback = f"myfiles_ms_select_{f_id_str}_{page}_{back_data}"
+            callback = f"mf_ms_sel_{f_id_str}_{page}_{back_data}"
         else:
             btn_text = f"{status_emoji} {name}"
             callback = f"myfiles_file_{f_id_str}"
@@ -142,14 +143,14 @@ async def build_files_list_keyboard(user_id: int, filter_query: dict, page: int,
     total_pages = math.ceil(total_files / limit) if total_files > 0 else 1
 
     if page > 0:
-        nav_row.append(InlineKeyboardButton("⬅️ Prev", callback_data=f"myfiles_page_{page-1}_{back_data}"))
+        nav_row.append(InlineKeyboardButton("⬅️ Prev", callback_data=f"mf_pg_{page-1}_{back_data}"))
     else:
         nav_row.append(InlineKeyboardButton(" ", callback_data="noop"))
 
     nav_row.append(InlineKeyboardButton(f"{page+1}/{total_pages}", callback_data="noop"))
 
     if skip + limit < total_files:
-        nav_row.append(InlineKeyboardButton("Next ➡️", callback_data=f"myfiles_page_{page+1}_{back_data}"))
+        nav_row.append(InlineKeyboardButton("Next ➡️", callback_data=f"mf_pg_{page+1}_{back_data}"))
     else:
         nav_row.append(InlineKeyboardButton(" ", callback_data="noop"))
 
@@ -158,15 +159,15 @@ async def build_files_list_keyboard(user_id: int, filter_query: dict, page: int,
     # Action buttons for the folder/category itself
     if multi_select and selected_files:
         buttons.append([
-            InlineKeyboardButton(f"📂 Move Selected ({len(selected_files)})", callback_data=f"myfiles_ms_move_{back_data}"),
-            InlineKeyboardButton(f"🗑 Delete Selected ({len(selected_files)})", callback_data=f"myfiles_ms_delete_{back_data}")
+            InlineKeyboardButton(f"📂 Move Selected ({len(selected_files)})", callback_data=f"mf_ms_mov_{back_data}"),
+            InlineKeyboardButton(f"🗑 Delete Selected ({len(selected_files)})", callback_data=f"mf_ms_del_{back_data}")
         ])
         buttons.append([
-            InlineKeyboardButton(f"🔗 Generate Share Link ({len(selected_files)})", callback_data=f"myfiles_ms_share_{back_data}")
+            InlineKeyboardButton(f"🔗 Generate Share Link ({len(selected_files)})", callback_data=f"mf_ms_sha_{back_data}")
         ])
 
     buttons.append([
-        InlineKeyboardButton("📤 Send All", callback_data=f"myfiles_sendall_{back_data}")
+        InlineKeyboardButton("📤 Send All", callback_data=f"mf_sa_{back_data}")
     ])
 
     buttons.append([InlineKeyboardButton("🔙 Back", callback_data=f"myfiles_leave_{back_data}")])
@@ -247,7 +248,7 @@ async def myfiles_command(client: Client, message: Message):
     text, markup = await get_myfiles_main_menu(user_id)
     await message.reply_text(text, reply_markup=markup)
 
-@Client.on_callback_query(filters.regex(r"^(myfiles_|mf_mov_|mf_df_)"))
+@Client.on_callback_query(filters.regex(r"^(myfiles_|mf_mov_|mf_df_|mf_pg_|mf_st_|mf_ms_|mf_sea_|mf_sa_)"))
 async def myfiles_callback(client: Client, callback_query: CallbackQuery):
     data = callback_query.data
     user_id = callback_query.from_user.id
@@ -255,12 +256,12 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
     # Fast-dismiss loading spinner except where we specifically want an alert.
     # We will answer below if we need a custom text.
     try:
-        if not (data.startswith("myfiles_send_") or data.startswith("myfiles_sendall_") or data.startswith("myfiles_delfile_") or data.startswith("myfiles_del_folder_") or data.startswith("mf_mov_") or data.startswith("mf_df_") or data.startswith("myfiles_ms_move_") or data.startswith("myfiles_ms_delete_")):
+        if not (data.startswith("myfiles_send_") or data.startswith("mf_sa_") or data.startswith("myfiles_delfile_") or data.startswith("myfiles_del_folder_") or data.startswith("mf_mov_") or data.startswith("mf_df_") or data.startswith("mf_ms_mov_") or data.startswith("mf_ms_del_")):
             await callback_query.answer()
     except Exception:
         pass
 
-    if data.startswith("myfiles_sort_toggle_"):
+    if data.startswith("mf_st_"):
         # The back_data here actually represents the menu we are currently in
         # (e.g. myfiles_cat_custom, myfiles_folder_<id>)
         # We need to re-render the page view.
@@ -268,13 +269,13 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
         # However, the callback_data for sort toggle only contains back_data which is the *parent* menu.
         # To truly reload the current page, we need to know the current folder context.
         parts = data.split("_", 3)
-        if len(parts) >= 4 and parts[3].startswith("page_"):
-            # New format: myfiles_sort_toggle_{page}_{back_data}
-            page = int(parts[3].replace("page_", "").split("_")[0])
-            back_data = data.replace(f"myfiles_sort_toggle_page_{page}_", "")
+        if len(parts) >= 4 and parts[3].startswith("pg_"):
+            # New format: mf_st_pg_{page}_{back_data}
+            page = int(parts[3].replace("pg_", "").split("_")[0])
+            back_data = data.replace(f"mf_st_pg_{page}_", "")
         else:
             page = 0
-            back_data = data.replace("myfiles_sort_toggle_", "")
+            back_data = data.replace("mf_st_", "")
 
         state_dict = await get_myfiles_state(user_id)
 
@@ -290,19 +291,19 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
         await set_myfiles_state(user_id, state_dict)
 
         # We simulate myfiles_page_ call which properly renders the file list using back_data as context
-        callback_query.data = f"myfiles_page_{page}_{back_data}"
+        callback_query.data = f"mf_pg_{page}_{back_data}"
         await myfiles_callback(client, callback_query)
         return
 
-    if data.startswith("myfiles_ms_toggle_"):
+    if data.startswith("mf_ms_") and not data.startswith("mf_ms_sel_") and not data.startswith("mf_ms_del_") and not data.startswith("mf_ms_sha_") and not data.startswith("mf_ms_mov_") and not data.startswith("mf_ms_domov_"):
         parts = data.split("_", 3)
-        if len(parts) >= 4 and parts[3].startswith("page_"):
-            # New format: myfiles_ms_toggle_{page}_{back_data}
-            page = int(parts[3].replace("page_", "").split("_")[0])
-            back_data = data.replace(f"myfiles_ms_toggle_page_{page}_", "")
+        if len(parts) >= 4 and parts[3].startswith("pg_"):
+            # New format: mf_ms_pg_{page}_{back_data}
+            page = int(parts[3].replace("pg_", "").split("_")[0])
+            back_data = data.replace(f"mf_ms_pg_{page}_", "")
         else:
             page = 0
-            back_data = data.replace("myfiles_ms_toggle_", "")
+            back_data = data.replace("mf_ms_", "")
 
         state_dict = await get_myfiles_state(user_id)
 
@@ -313,13 +314,13 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
 
         await set_myfiles_state(user_id, state_dict)
 
-        callback_query.data = f"myfiles_page_{page}_{back_data}"
+        callback_query.data = f"mf_pg_{page}_{back_data}"
         await myfiles_callback(client, callback_query)
         return
 
-    if data.startswith("myfiles_ms_select_"):
-        # Format: myfiles_ms_select_{file_id}_{page}_{back_data}
-        parts = data.replace("myfiles_ms_select_", "").split("_", 2)
+    if data.startswith("mf_ms_sel_"):
+        # Format: mf_ms_sel_{file_id}_{page}_{back_data}
+        parts = data.replace("mf_ms_sel_", "").split("_", 2)
         f_id_str = parts[0]
         page = parts[1]
         back_data = parts[2]
@@ -336,12 +337,12 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
         await set_myfiles_state(user_id, state_dict)
 
         # Trigger page refresh
-        callback_query.data = f"myfiles_page_{page}_{back_data}"
+        callback_query.data = f"mf_pg_{page}_{back_data}"
         await myfiles_callback(client, callback_query)
         return
 
-    if data.startswith("myfiles_ms_delete_"):
-        back_data = data.replace("myfiles_ms_delete_", "")
+    if data.startswith("mf_ms_del_"):
+        back_data = data.replace("mf_ms_del_", "")
         state_dict = await get_myfiles_state(user_id)
         selected_files = state_dict.get("selected_files", [])
 
@@ -381,8 +382,8 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
         await myfiles_callback(client, callback_query)
         return
 
-    if data.startswith("myfiles_ms_share_"):
-        back_data = data.replace("myfiles_ms_share_", "")
+    if data.startswith("mf_ms_sha_"):
+        back_data = data.replace("mf_ms_sha_", "")
         state_dict = await get_myfiles_state(user_id)
         selected_files = state_dict.get("selected_files", [])
 
@@ -449,19 +450,19 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
         await set_myfiles_state(user_id, state_dict)
         return
 
-    if data.startswith("myfiles_ms_move_"):
-        back_data = data.replace("myfiles_ms_move_", "")
+    if data.startswith("mf_ms_mov_"):
+        back_data = data.replace("mf_ms_mov_", "")
 
         cursor = db.folders.find({"user_id": user_id, "type": "custom"}).sort("name", 1)
         folders = await cursor.to_list(length=None)
 
         text = "📂 **Batch Move Files**\n\nSelect a folder to move the selected files to:"
         buttons = [
-            [InlineKeyboardButton("🧹 Remove from Folder", callback_data=f"myfiles_ms_domove_None_{back_data}")]
+            [InlineKeyboardButton("🧹 Remove from Folder", callback_data=f"mf_ms_domov_None_{back_data}")]
         ]
 
         for folder in folders:
-            buttons.append([InlineKeyboardButton(f"📁 {folder['name']}", callback_data=f"myfiles_ms_domove_{str(folder['_id'])}_{back_data}")])
+            buttons.append([InlineKeyboardButton(f"📁 {folder['name']}", callback_data=f"mf_ms_domov_{str(folder['_id'])}_{back_data}")])
 
         buttons.append([InlineKeyboardButton("🔙 Cancel", callback_data=back_data)])
 
@@ -471,8 +472,8 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
             pass
         return
 
-    if data.startswith("myfiles_ms_domove_"):
-        parts = data.replace("myfiles_ms_domove_", "").split("_", 1)
+    if data.startswith("mf_ms_domov_"):
+        parts = data.replace("mf_ms_domov_", "").split("_", 1)
         folder_id = parts[0]
         back_data = parts[1]
 
@@ -746,7 +747,7 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
 
             buttons = []
             for season in sorted(season_counts.keys(), key=lambda x: int(x) if x.isdigit() else 9999):
-                buttons.append([InlineKeyboardButton(f"📁 Season {season} ({season_counts[season]})", callback_data=f"myfiles_season_{folder_id}_{season}")])
+                buttons.append([InlineKeyboardButton(f"📁 Season {season} ({season_counts[season]})", callback_data=f"mf_sea_{folder_id}_{season}")])
 
             buttons.append([InlineKeyboardButton("🔙 Back", callback_data=f"myfiles_cat_{folder.get('type', 'custom')}")])
             total = sum(season_counts.values())
@@ -771,8 +772,8 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
             pass
         return
 
-    if data.startswith("myfiles_season_"):
-        parts = data.replace("myfiles_season_", "").split("_")
+    if data.startswith("mf_sea_"):
+        parts = data.replace("mf_sea_", "").split("_")
         folder_id = parts[0]
         season = parts[1]
 
@@ -812,8 +813,8 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
             pass
         return
 
-    if data.startswith("myfiles_page_"):
-        parts = data.replace("myfiles_page_", "").split("_")
+    if data.startswith("mf_pg_"):
+        parts = data.replace("mf_pg_", "").split("_")
         page = max(0, int(parts[0]))
         back_data = "_".join(parts[1:])
 
@@ -1151,25 +1152,25 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
         await myfiles_callback(client, callback_query)
         return
 
-    if data.startswith("myfiles_sendall_"):
-        back_data = data.replace("myfiles_sendall_", "")
+    if data.startswith("mf_sa_"):
+        back_data = data.replace("mf_sa_", "")
 
         filter_query = {"user_id": user_id} if Config.PUBLIC_MODE else {}
 
-        # When paginating, back_data is wrapped like myfiles_page_{page}_myfiles_folder_{id}
+        # When paginating, back_data is wrapped like mf_pg_{page}_myfiles_folder_{id}
         # The true back_data is passed, so we need to extract the real context if it's nested
 
         real_back_data = back_data
         parts = back_data.split("_", 3)
-        if len(parts) >= 4 and parts[0] == "myfiles" and parts[1] == "page":
+        if len(parts) >= 4 and parts[0] == "mf" and parts[1] == "pg":
             # Extract the actual back data
-            real_back_data = back_data.replace(f"myfiles_page_{parts[2]}_", "")
+            real_back_data = back_data.replace(f"mf_pg_{parts[2]}_", "")
 
         if real_back_data.startswith("myfiles_folder_"):
             folder_id = real_back_data.replace("myfiles_folder_", "")
             filter_query["folder_id"] = ObjectId(folder_id)
-        elif real_back_data.startswith("myfiles_season_"):
-            parts = real_back_data.replace("myfiles_season_", "").split("_")
+        elif real_back_data.startswith("mf_sea_"):
+            parts = real_back_data.replace("mf_sea_", "").split("_")
             folder_id = parts[0]
             season = parts[1]
             filter_query["folder_id"] = ObjectId(folder_id)
@@ -1217,12 +1218,12 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
         # Add to Queue Manager
         from utils.queue_manager import queue_manager
         import time
-        batch_id = f"sendall_{user_id}_{int(time.time())}"
 
-        queue_manager.create_batch(batch_id, len(files), user_id)
+        batch_id = queue_manager.create_batch()
         # Register items into the batch so update_status works
         for i, f in enumerate(files):
-            queue_manager.add_item(batch_id, str(i), f.get("file_name", f"File {i}"))
+            # Using add_to_batch which handles (batch_id, item_id, sort_key, display_name, message_id)
+            queue_manager.add_to_batch(batch_id, str(i), (0, i, 0), f.get("file_name", f"File {i}"), 0)
 
         # Kick off background task to send files
         import asyncio

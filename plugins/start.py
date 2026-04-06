@@ -71,6 +71,7 @@ async def handle_start_command_unique(client, message):
 
                     # We could queue this or send them slowly
                     import asyncio
+                    from pyrogram.errors import PeerIdInvalid
                     count = 0
                     for fid_str in file_ids:
                         f = await db.files.find_one({"_id": ObjectId(fid_str)})
@@ -84,13 +85,27 @@ async def handle_start_command_unique(client, message):
                                 )
                                 count += 1
                                 await asyncio.sleep(0.5) # Anti-flood delay
+                            except PeerIdInvalid:
+                                try:
+                                    await client.get_chat(f["channel_id"])
+                                    await client.copy_message(
+                                        chat_id=user_id,
+                                        from_chat_id=f["channel_id"],
+                                        message_id=f["message_id"],
+                                        protect_content=protect
+                                    )
+                                    count += 1
+                                    await asyncio.sleep(0.5)
+                                except Exception as inner_e:
+                                    logger.error(f"Failed to copy group file {fid_str} (Peer fallback failed): {inner_e}")
                             except Exception as e:
                                 logger.error(f"Failed to copy group file {fid_str}: {e}")
 
                     try:
                         await client.send_sticker(user_id, "CAACAgIAAxkBAAEQa0xpgkMvycmQypya3zZxS5rU8tuKBQACwJ0AAjP9EEgYhDgLPnTykDgE")
                     except Exception:
-                        await message.reply_text(f"✅ Delivered {count} files successfully.")
+                        pass
+                    await message.reply_text(f"✅ Delivered {count} files successfully.")
 
                     raise StopPropagation
             except Exception as e:

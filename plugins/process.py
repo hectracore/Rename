@@ -1383,6 +1383,10 @@ class TaskProcessor:
                         settings = await db.get_settings(self.user_id)
                         system_filename_template = settings.get("templates", {}).get("system_filename")
 
+                        safe_title = re.sub(r'[\\/*?:"<>|,;\'!]', "", self.title) if self.title else ""
+                        safe_title = safe_title.replace("&", "and")
+                        year_str = str(self.year) if self.year else ""
+
                         if system_filename_template:
                             # Ensure episode is safely formatted for formatting string dict
                             ep_str_for_sys = "".join([f"E{int(e):02d}" for e in self.episode]) if isinstance(self.episode, list) else f"{self.episode:02d}" if self.episode else ""
@@ -1398,10 +1402,8 @@ class TaskProcessor:
                             try:
                                 base_name = system_filename_template.format(**sys_fmt_dict)
                             except KeyError:
-                                try:
-                                    base_name = system_filename_template.format(**fmt_dict)
-                                except Exception:
-                                    base_name = self.title if self.title else "unknown"
+                                # We don't have fmt_dict here anymore, fallback to a safe title format
+                                base_name = f"{safe_title}" if safe_title else "unknown"
 
                             def clean_sys_filename(name, orig_template=""):
                                 import re
@@ -1411,15 +1413,15 @@ class TaskProcessor:
                                 name = re.sub(r'[\._\s]{2,}', " ", name)
                                 name = name.strip('._ ')
                                 return name
-                            internal_name = clean_sys_filename(base_name, system_filename_template) + ext
+                            internal_name = clean_sys_filename(base_name, system_filename_template) + file_ext
                         elif self.title:
                             if self.media_type == "series":
                                 ep_str = "".join([f"E{int(e):02d}" for e in self.episode]) if isinstance(self.episode, list) else f"E{self.episode:02d}" if self.episode else ""
-                                internal_name = f"{self.title} S{self.season:02d}{ep_str}{ext}"
+                                internal_name = f"{self.title} S{self.season:02d}{ep_str}{file_ext}"
                             elif self.year:
-                                internal_name = f"{self.title} ({self.year}){ext}"
+                                internal_name = f"{self.title} ({self.year}){file_ext}"
                             else:
-                                internal_name = f"{self.title}{ext}"
+                                internal_name = f"{self.title}{file_ext}"
                     except Exception as e:
                         logger.warning(f"Error applying system filename template: {e}")
 
