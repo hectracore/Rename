@@ -1,7 +1,6 @@
 # --- Imports ---
 from pyrogram import Client, filters
 from pyrogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
-from pyrogram.errors import MessageNotModified
 from config import Config
 from database import db
 from utils.log import get_logger
@@ -378,14 +377,7 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
             state_dict["selected_files"] = []
             await set_myfiles_state(user_id, state_dict)
 
-        # If the context is a season view, leaving means going back up to the folder (season selection)
-        if back_data.startswith("myfiles_season_"):
-            parts = back_data.replace("myfiles_season_", "").split("_")
-            folder_id = parts[0]
-            callback_query.data = f"myfiles_folder_{folder_id}"
-        else:
-            callback_query.data = back_data
-
+        callback_query.data = back_data
         await myfiles_callback(client, callback_query)
         return
 
@@ -811,7 +803,7 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
                 {"tmdb_data.season": {"$exists": False}}
             ]
 
-        buttons, total = await build_files_list_keyboard(user_id, filter_query, page=0, back_data=f"myfiles_season_{folder_id}_{season}")
+        buttons, total = await build_files_list_keyboard(user_id, filter_query, page=0, back_data=f"myfiles_folder_{folder_id}")
 
         text = f"📁 **{folder['name']} - Season {season}** ({total} files)\n\n📌 = Permanent | ⏳ = Temporary"
         try:
