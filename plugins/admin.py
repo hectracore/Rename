@@ -151,7 +151,7 @@ async def get_admin_access_limits_menu():
 
     if Config.PUBLIC_MODE:
         buttons.append([InlineKeyboardButton("📋 Per-Plan Settings", callback_data="admin_per_plan_limits")])
-        buttons.append([InlineKeyboardButton("🌍 Global Daily Egress Limit", callback_data="admin_global_limit")])
+        buttons.append([InlineKeyboardButton("🌍 Global Daily Egress Limit", callback_data="admin_global_daily_egress")])
     else:
         buttons.append(
             [
@@ -161,7 +161,7 @@ async def get_admin_access_limits_menu():
             ]
         )
 
-    buttons.append([InlineKeyboardButton("← Back to Settings", callback_data="admin_access_limits")])
+    buttons.append([InlineKeyboardButton("← Back to Admin Panel", callback_data="admin_main")])
     return InlineKeyboardMarkup(buttons)
 
 def get_admin_public_settings_menu():
@@ -253,7 +253,7 @@ async def admin_callback(client, callback_query):
             buttons.append([InlineKeyboardButton("⚙️ Global Limits", callback_data="admin_myfiles_limits")])
 
         buttons.append([InlineKeyboardButton("🧹 DB Cleanup Tools", callback_data="admin_myfiles_cleanup")])
-        buttons.append([InlineKeyboardButton("← Back", callback_data="admin_limits_menu" if Config.PUBLIC_MODE else "admin_main")])
+        buttons.append([InlineKeyboardButton("← Back", callback_data="admin_access_limits" if Config.PUBLIC_MODE else "admin_main")])
         try:
             await callback_query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons))
         except MessageNotModified:
@@ -321,7 +321,7 @@ async def admin_callback(client, callback_query):
             [InlineKeyboardButton("🆓 Manage Free Plan", callback_data="admin_edit_plan_free")],
             [InlineKeyboardButton("🌟 Manage Standard Plan", callback_data="admin_edit_plan_standard")],
             [InlineKeyboardButton("💎 Manage Deluxe Plan", callback_data="admin_edit_plan_deluxe")],
-            [InlineKeyboardButton("← Back to Settings", callback_data="admin_limits_menu")]
+            [InlineKeyboardButton("← Back to Settings", callback_data="admin_access_limits")]
         ]
 
         try:
@@ -951,7 +951,7 @@ async def admin_callback(client, callback_query):
             [InlineKeyboardButton(f"{emoji(sub_en)} Subtitle Extractor", callback_data="admin_toggle_subtitle_extractor")],
             [InlineKeyboardButton(f"{emoji(wm_en)} Image Watermarker", callback_data="admin_toggle_watermarker")],
             [InlineKeyboardButton(f"{emoji(audio_en)} Audio Editor", callback_data="admin_toggle_audio_editor")],
-            [InlineKeyboardButton("← Back to Settings", callback_data="admin_access_menu")]
+            [InlineKeyboardButton("← Back to Settings", callback_data="admin_access_limits")]
         ]
 
         try:
@@ -989,7 +989,7 @@ async def admin_callback(client, callback_query):
                         ],
                         [
                             InlineKeyboardButton(
-                                "← Back to Settings", callback_data="admin_limits_menu"
+                                "← Back to Settings", callback_data="admin_access_limits"
                             )
                         ],
                     ]
@@ -1000,7 +1000,7 @@ async def admin_callback(client, callback_query):
         return
 
     if Config.PUBLIC_MODE and (
-        data.startswith("admin_premium_") or data.startswith("prompt_premium_") or data.startswith("prompt_trial_") or data.startswith("admin_trial_")
+        data.startswith("admin_premium_") or data.startswith("prompt_premium_") or data.startswith("prompt_trial_") or data.startswith("admin_trial_") or data.startswith("admin_features_") or data.startswith("admin_privacy_")
     ):
         if data == "admin_premium_settings":
             config = await db.get_public_config()
@@ -1034,7 +1034,7 @@ async def admin_callback(client, callback_query):
                 if trial_enabled:
                     buttons.append([InlineKeyboardButton("⏱ Edit Trial Duration", callback_data="prompt_trial_days")])
 
-            buttons.append([InlineKeyboardButton("← Back to Settings", callback_data="admin_limits_menu")])
+            buttons.append([InlineKeyboardButton("← Back to Settings", callback_data="admin_access_limits")])
 
             try:
                 await callback_query.message.edit_text(
@@ -1432,7 +1432,7 @@ async def admin_callback(client, callback_query):
             await callback_query.message.edit_text(
                 "🌍 **Send the new global daily egress limit in MB (e.g., 102400 for 100GB).**\nSend `0` to disable.",
                 reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton("❌ Cancel", callback_data="admin_limits_menu")]]
+                    [[InlineKeyboardButton("❌ Cancel", callback_data="admin_access_limits")]]
                 ),
             )
         except MessageNotModified:
@@ -1513,6 +1513,7 @@ async def admin_callback(client, callback_query):
         or data.startswith("admin_fs_")
         or data.startswith("admin_premium_")
         or data.startswith("prompt_premium_")
+        or data.startswith("set_daily_egress_")
     ):
         if data == "admin_public_view":
             config = await db.get_public_config()
@@ -2929,14 +2930,14 @@ async def handle_admin_text(client, message):
         if not val.isdigit():
             await edit_or_reply(client, message, msg_id, "❌ Invalid number. Try again.",
                 reply_markup=InlineKeyboardMarkup(
-                        [[InlineKeyboardButton("❌ Cancel", callback_data="admin_limits_menu")]]
+                        [[InlineKeyboardButton("❌ Cancel", callback_data="admin_access_limits")]]
                 ),
             )
             return
         await db.update_global_daily_egress_limit(float(val))
         await edit_or_reply(client, message, msg_id, f"✅ Global daily egress limit updated to `{val}` MB.",
             reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton("← Back to Settings", callback_data="admin_limits_menu")]]
+                    [[InlineKeyboardButton("← Back to Settings", callback_data="admin_access_limits")]]
             ),
         )
         admin_sessions.pop(user_id, None)
