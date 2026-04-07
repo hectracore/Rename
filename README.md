@@ -328,3 +328,10 @@ This project is open-source under the **XTV Public License**.
     <i>© 2026 XTV Network Global. All Rights Reserved.</i>
   </p>
 </div>
+
+
+## Recent Changes
+- **Admin Menu Redesign:** The 'Configure Features' menu is now beautifully grouped into 'Account Perks', 'Media Tools', and 'Privacy'.
+- **4GB Access Toggle:** The 'XTV Pro 4GB Access' is now a cascading per-plan feature toggle instead of a global setting.
+- **Privacy Menu Access:** The Privacy Settings menu in `/myfiles` is dynamically hidden for users without the feature enabled, keeping the UI clean.
+- **Automated Batch Sharing:** Batch processing now automatically generates an elegant share link summary, gated by the 'batch_sharing' plan feature.

@@ -541,7 +541,8 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
         config = await db.get_public_config() if Config.PUBLIC_MODE else await db.settings.find_one({"_id": "global_settings"})
         plan_features = config.get(f"premium_{plan}", {}).get("features", {})
 
-        if plan_features.get("privacy_settings", False) or plan == "global":
+        is_global_admin = (user_id == Config.CEO_ID or user_id in Config.ADMIN_IDS)
+        if plan_features.get("privacy_settings", False) or plan == "global" or is_global_admin:
             buttons.append([InlineKeyboardButton("🔒 Privacy Settings", callback_data="myfiles_privacy_settings")])
 
         buttons.append([InlineKeyboardButton("🗑️ Clear Permanent Storage", callback_data="myfiles_clear_perm")])
@@ -577,7 +578,9 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
         plan_features = config.get(f"premium_{plan}", {}).get("features", {})
         privacy_feat = plan_features.get("privacy", {})
 
-        if not plan_features.get("privacy_settings", False) and plan != "global":
+        is_global_admin = (user_id == Config.CEO_ID or user_id in Config.ADMIN_IDS)
+
+        if not plan_features.get("privacy_settings", False) and plan != "global" and not is_global_admin:
             await callback_query.answer("Your current plan does not have access to Privacy Settings.", show_alert=True)
             return
 
@@ -608,15 +611,15 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
 
         buttons = []
 
-        if privacy_feat.get("hide_display_name", False) or plan == "global":
+        if privacy_feat.get("hide_display_name", False) or plan == "global" or is_global_admin:
             text += "**Share Display Name:** When enabled, your name will be displayed when sharing your files with others via deep links.\n\n"
             buttons.append([InlineKeyboardButton(f"Display Name on Shares: {emoji_name}", callback_data="myfiles_toggle_share_name")])
 
-        if privacy_feat.get("hide_forward_tags", False) or plan == "global":
+        if privacy_feat.get("hide_forward_tags", False) or plan == "global" or is_global_admin:
             text += "**Hide Forwarding Tags:** When enabled, forwarded files will not have 'Forwarded from' tags when shared via deep links.\n\n"
             buttons.append([InlineKeyboardButton(f"Hide Forward Tags: {emoji_fwd}", callback_data="myfiles_toggle_hide_fwd")])
 
-        if privacy_feat.get("link_anonymity", False) or plan == "global":
+        if privacy_feat.get("link_anonymity", False) or plan == "global" or is_global_admin:
             text += "**Link Anonymity:** When enabled, batch share links use a secure, anonymous hash rather than embedding your account ID.\n\n"
             buttons.append([InlineKeyboardButton(f"Link Anonymity: {emoji_anon}", callback_data="myfiles_toggle_link_anon")])
 
@@ -635,7 +638,8 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
         config = await db.get_public_config() if Config.PUBLIC_MODE else await db.settings.find_one({"_id": "global_settings"})
         plan_features = config.get(f"premium_{plan}", {}).get("features", {})
         privacy_feat = plan_features.get("privacy", {})
-        if not privacy_feat.get("link_anonymity", False) and plan != "global":
+        is_global_admin = (user_id == Config.CEO_ID or user_id in Config.ADMIN_IDS)
+        if not privacy_feat.get("link_anonymity", False) and plan != "global" and not is_global_admin:
             await callback_query.answer("Your current plan does not have access to this setting.", show_alert=True)
             return
 
@@ -657,7 +661,8 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
 
         config = await db.get_public_config() if Config.PUBLIC_MODE else await db.settings.find_one({"_id": "global_settings"})
         plan_features = config.get(f"premium_{plan}", {}).get("features", {})
-        if not plan_features.get("privacy_settings", False) and plan != "global":
+        is_global_admin = (user_id == Config.CEO_ID or user_id in Config.ADMIN_IDS)
+        if not plan_features.get("privacy_settings", False) and plan != "global" and not is_global_admin:
             await callback_query.answer("Your current plan does not have access to Privacy Settings.", show_alert=True)
             return
 
@@ -681,7 +686,8 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
 
         config = await db.get_public_config() if Config.PUBLIC_MODE else await db.settings.find_one({"_id": "global_settings"})
         plan_features = config.get(f"premium_{plan}", {}).get("features", {})
-        if not plan_features.get("privacy_settings", False) and plan != "global":
+        is_global_admin = (user_id == Config.CEO_ID or user_id in Config.ADMIN_IDS)
+        if not plan_features.get("privacy_settings", False) and plan != "global" and not is_global_admin:
             await callback_query.answer("Your current plan does not have access to Privacy Settings.", show_alert=True)
             return
 
