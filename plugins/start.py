@@ -627,7 +627,7 @@ async def handle_help_callbacks(client, callback_query):
     debug(f"Help callback received: {data} from {user_id}")
 
     back_button = [
-        [InlineKeyboardButton("🔙 Back to Help Menu", callback_data="help_guide")]
+        [InlineKeyboardButton("← Back to Help Menu", callback_data="help_guide")]
     ]
 
     if data == "help_guide":
@@ -690,7 +690,7 @@ async def handle_help_callbacks(client, callback_query):
                          InlineKeyboardButton("🔀 File Converter", callback_data="help_tool_convert")],
                         [InlineKeyboardButton("© Image Watermarker", callback_data="help_tool_watermark"),
                          InlineKeyboardButton("📝 Subtitle Extractor", callback_data="help_tool_subtitle")],
-                        [InlineKeyboardButton("🔙 Back to Help Menu", callback_data="help_guide")]
+                        [InlineKeyboardButton("← Back to Help Menu", callback_data="help_guide")]
                     ]
                 )
             )
@@ -699,7 +699,7 @@ async def handle_help_callbacks(client, callback_query):
 
     elif data.startswith("help_tool_"):
         tool = data.split("_")[-1]
-        back_to_tools = [[InlineKeyboardButton("🔙 Back to Tools", callback_data="help_tools")]]
+        back_to_tools = [[InlineKeyboardButton("← Back to Tools", callback_data="help_tools")]]
 
         if tool == "rename":
             text = (
@@ -876,7 +876,7 @@ async def handle_help_callbacks(client, callback_query):
                          InlineKeyboardButton("⏳ Stuck Processing", callback_data="help_ts_stuck")],
                         [InlineKeyboardButton("🎵 Missing Audio/Subs", callback_data="help_ts_missing_tracks"),
                          InlineKeyboardButton("📝 Subtitles Won't Extract", callback_data="help_ts_subs_fail")],
-                        [InlineKeyboardButton("🔙 Back to Help Menu", callback_data="help_guide")]
+                        [InlineKeyboardButton("← Back to Help Menu", callback_data="help_guide")]
                     ]
                 )
             )
@@ -885,7 +885,7 @@ async def handle_help_callbacks(client, callback_query):
 
     elif data.startswith("help_ts_"):
         issue = data.replace("help_ts_", "")
-        back_to_ts = [[InlineKeyboardButton("🔙 Back to Troubleshooting", callback_data="help_troubleshooting")]]
+        back_to_ts = [[InlineKeyboardButton("← Back to Troubleshooting", callback_data="help_troubleshooting")]]
 
         if issue == "no_response":
             text = (
