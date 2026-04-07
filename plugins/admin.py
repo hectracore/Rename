@@ -66,7 +66,7 @@ def get_admin_main_menu(pro_session, public_mode):
         keyboard.append(
             [
                 InlineKeyboardButton(
-                    "📁 𝕏Files Settings", callback_data="admin_myfiles_settings"
+                    "📁 MyFiles Settings", callback_data="admin_myfiles_settings"
                 ),
             ]
         )
@@ -107,7 +107,7 @@ def get_admin_main_menu(pro_session, public_mode):
         keyboard.append(
             [
                 InlineKeyboardButton(
-                    "📁 𝕏Files Settings", callback_data="admin_myfiles_settings"
+                    "📁 MyFiles Settings", callback_data="admin_myfiles_settings"
                 ),
             ]
         )
@@ -245,7 +245,7 @@ async def admin_callback(client, callback_query):
     debug(f"Admin callback: {data} from user {user_id}")
 
     if data == "admin_myfiles_settings":
-        text = "📁 **𝕏Files Settings**\n\nConfigure database channels, storage limits, and cleanup unused files."
+        text = "📁 **MyFiles Settings**\n\nConfigure database channels, storage limits, and cleanup unused files."
         buttons = [
             [InlineKeyboardButton("🗄️ Database Channels", callback_data="admin_myfiles_db_channels")],
         ]
@@ -279,7 +279,7 @@ async def admin_callback(client, callback_query):
                 [InlineKeyboardButton("✏️ Edit Free", callback_data="prompt_myfiles_db_free"),
                  InlineKeyboardButton("✏️ Edit Standard", callback_data="prompt_myfiles_db_standard")],
                 [InlineKeyboardButton("✏️ Edit Deluxe", callback_data="prompt_myfiles_db_deluxe")],
-                [InlineKeyboardButton("← Back to 𝕏Files Settings", callback_data="admin_myfiles_settings")]
+                [InlineKeyboardButton("← Back to MyFiles Settings", callback_data="admin_myfiles_settings")]
             ]
         else:
             global_ch = channels.get("global", "Not Set")
@@ -290,7 +290,7 @@ async def admin_callback(client, callback_query):
             )
             buttons = [
                 [InlineKeyboardButton("✏️ Edit Global", callback_data="prompt_myfiles_db_global")],
-                [InlineKeyboardButton("← Back to 𝕏Files Settings", callback_data="admin_myfiles_settings")]
+                [InlineKeyboardButton("← Back to MyFiles Settings", callback_data="admin_myfiles_settings")]
             ]
 
         try:
@@ -445,7 +445,7 @@ async def admin_callback(client, callback_query):
         )
         buttons = [
             [InlineKeyboardButton("✏️ Edit Global Limits", callback_data="admin_myfiles_edit_limits_global")],
-            [InlineKeyboardButton("← Back to 𝕏Files Settings", callback_data="admin_myfiles_settings")]
+            [InlineKeyboardButton("← Back to MyFiles Settings", callback_data="admin_myfiles_settings")]
         ]
 
         try:
@@ -507,7 +507,7 @@ async def admin_callback(client, callback_query):
         buttons = [
             [InlineKeyboardButton("🧹 Clear Free Expired", callback_data="admin_myfiles_clean_free")],
             [InlineKeyboardButton("🧹 Clear Donator Expired", callback_data="admin_myfiles_clean_donator")],
-            [InlineKeyboardButton("← Back to 𝕏Files Settings", callback_data="admin_myfiles_settings")]
+            [InlineKeyboardButton("← Back to MyFiles Settings", callback_data="admin_myfiles_settings")]
         ]
         try:
             await callback_query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons))
