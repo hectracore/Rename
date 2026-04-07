@@ -150,7 +150,7 @@ async def get_myfiles_main_menu(user_id: int):
         limit_str = str(perm_limit) if perm_limit != -1 else "Unlimited"
 
         text = (
-            "📁 **My Files Management**\n\n"
+            "📁 **𝕏Files Management**\n\n"
             f"**Plan:** `{plan.capitalize()}`\n"
             f"**Permanent Storage:** `{perm_count} / {limit_str}` files\n"
             f"**Temporary Storage:** `{temp_count}` files\n\n"
@@ -166,7 +166,7 @@ async def get_myfiles_main_menu(user_id: int):
         limit_str = str(perm_limit) if perm_limit != -1 else "Unlimited"
 
         text = (
-            "📁 **Team Files Management**\n\n"
+            "📁 **Team 𝕏Files Management**\n\n"
             f"**Permanent Storage:** `{perm_count} / {limit_str}` files\n"
             f"**Temporary Storage:** `{temp_count}` files\n\n"
             "Select a category to view files:"
@@ -353,7 +353,7 @@ async def myfiles_text_handler(client: Client, message: Message):
     raise ContinuePropagation
 
 # === Handlers ===
-@Client.on_message(filters.command("myfiles") & filters.private)
+@Client.on_message(filters.command(["myfiles", "xfiles"]) & filters.private)
 async def myfiles_command(client: Client, message: Message):
     user_id = message.from_user.id
     if not Config.PUBLIC_MODE and user_id != Config.CEO_ID and user_id not in Config.ADMIN_IDS:
@@ -625,7 +625,7 @@ async def myfiles_callback(client: Client, callback_query: CallbackQuery):
         group_emoji = "✅ ON" if grouping_enabled else "❌ OFF"
 
         text = (
-            "⚙️ **/myfiles Settings**\n\n"
+            "⚙️ **𝕏Files Settings**\n\n"
             "**Auto-Permanent Mode:** When enabled, files will automatically consume your permanent storage slots. "
             "When disabled, files are saved as temporary by default, and you must manually mark them as permanent.\n\n"
             "**Group Series by Season:** When enabled, files in Series folders will be dynamically grouped into virtual Season subfolders based on metadata."
