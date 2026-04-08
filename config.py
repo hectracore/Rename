@@ -11,8 +11,8 @@ class Config:
     API_ID = int(os.getenv("API_ID", 0))
     API_HASH = os.getenv("API_HASH")
 
-    MAIN_URI = os.getenv("mongodb+srv://renamebot:renamebot@cluster0.xt9gzs7.mongodb.net/?appName=Cluster0")
-    DB_NAME = "Cluster0"
+    MAIN_URI = os.getenv("")
+    DB_NAME = "MainDB"
     SETTINGS_COLLECTION = "MediaStudio-Settings"
 
     CEO_ID = int(os.getenv("CEO_ID", 0))
