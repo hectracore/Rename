@@ -11,12 +11,12 @@ class Config:
     API_ID = int(os.getenv("API_ID", 0))
     API_HASH = os.getenv("API_HASH")
 
-    MAIN_URI = os.getenv("MAIN_URI")
+    MAIN_URI = os.getenv("mongodb+srv://renamebot:renamebot@cluster0.xt9gzs7.mongodb.net/?appName=Cluster0")
     DB_NAME = "MainDB"
     SETTINGS_COLLECTION = "MediaStudio-Settings"
 
     CEO_ID = int(os.getenv("CEO_ID", 0))
-    ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip()]
+    ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_IDS", "6161553871").split(",") if x.strip()]
 
     PUBLIC_MODE = os.getenv("PUBLIC_MODE", "False").lower() == "true"
     DEBUG_MODE = os.getenv("DEBUG_MODE", "False").lower() in ("true", "1", "yes")
